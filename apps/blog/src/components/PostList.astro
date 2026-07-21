@@ -1,0 +1,39 @@
+---
+import type { PostSummary, SiteSettings } from "@cf-blog/contracts";
+import { formatDate } from "@/lib/format";
+
+interface Props {
+  posts: PostSummary[];
+  site: SiteSettings;
+}
+
+const { posts, site } = Astro.props;
+---
+
+<div class="post-list">
+  {posts.length === 0 && <p class="empty-state">还没有公开文章。</p>}
+  {posts.map((post) => (
+    <article class="post-card">
+      <a href={`/posts/${post.slug}`} class="post-card-link">
+        <div class="post-card-main">
+          <h2>{post.title}</h2>
+          {post.excerpt && <p>{post.excerpt}</p>}
+        </div>
+        {post.coverUrl && <img src={post.coverUrl} alt="" loading="lazy" />}
+      </a>
+      <div class="post-card-footer">
+        {post.tags.length > 0 && (
+          <div class="tag-row">
+            {post.tags.map((tag) => <a href={`/tags/${encodeURIComponent(tag)}`}>#{tag}</a>)}
+          </div>
+        )}
+        <div class="post-meta">
+          <time datetime={post.publishedAt ?? post.updatedAt}>
+            {formatDate(post.publishedAt ?? post.updatedAt, site.locale)}
+          </time>
+          {site.showReadingTime && <span>{post.readingMinutes} 分钟</span>}
+        </div>
+      </div>
+    </article>
+  ))}
+</div>

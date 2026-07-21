@@ -1,0 +1,21 @@
+---
+import PostList from "@/components/PostList.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+
+const tag = decodeURIComponent(Astro.params.tag ?? "");
+const [site, allPosts] = await Promise.all([
+  cms.site(),
+  cms.archive()
+]);
+const posts = allPosts.filter((post) => post.tags.includes(tag));
+---
+
+<BaseLayout site={site} title={`标签：${tag}`}>
+  <header class="section-hero">
+    <p class="kicker">Topic</p>
+    <h1>#{tag}</h1>
+    <p>{posts.length} 篇文章</p>
+  </header>
+  <PostList posts={posts} site={site} />
+</BaseLayout>

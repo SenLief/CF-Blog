@@ -1,0 +1,32 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+
+const [site, groups] = await Promise.all([
+  cms.site(),
+  cms.groups()
+]);
+---
+
+<BaseLayout site={site} title="系列">
+  <div class="series-page">
+    <header class="section-hero series-hero">
+      <p class="kicker">Series</p>
+      <h1>系列</h1>
+      <p>按阅读顺序整理的一组文字。</p>
+    </header>
+    <div class="series-list">
+      {groups.map((group, index) => (
+        <a class="series-list-item" href={`/series/${encodeURIComponent(group.slug)}`}>
+          <span class="series-number">{String(index + 1).padStart(2, "0")}</span>
+          <span class="series-list-main">
+            <strong>{group.name}</strong>
+            {group.description && <span>{group.description}</span>}
+          </span>
+          <small>{group.postCount} 篇</small>
+        </a>
+      ))}
+      {groups.length === 0 && <p class="empty-state">还没有公开系列。</p>}
+    </div>
+  </div>
+</BaseLayout>

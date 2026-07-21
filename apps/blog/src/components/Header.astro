@@ -1,0 +1,54 @@
+---
+import type { SiteSettings } from "@cf-blog/contracts";
+
+interface Props {
+  site: SiteSettings;
+}
+
+const { site } = Astro.props;
+const defaultNav = [
+  { label: "归档", href: "/archives" },
+  { label: "标签", href: "/tags" },
+  { label: "系列", href: "/series" },
+  { label: "搜索", href: "/search" },
+  { label: "关于", href: "/about" }
+];
+const configuredNav = site.nav.length > 0 ? site.nav : defaultNav;
+const hasSeries = configuredNav.some(
+  (item) => item.href.replace(/\/+$/, "") === "/series"
+);
+const insertionIndex = configuredNav.findIndex(
+  (item) =>
+    item.href.replace(/\/+$/, "") === "/search" ||
+    item.href.replace(/\/+$/, "") === "/about"
+);
+const nav = hasSeries
+  ? configuredNav
+  : [
+      ...configuredNav.slice(0, insertionIndex < 0 ? configuredNav.length : insertionIndex),
+      { label: "系列", href: "/series" },
+      ...configuredNav.slice(insertionIndex < 0 ? configuredNav.length : insertionIndex)
+    ];
+---
+
+<header class="site-header">
+  <a class="site-name" href="/">{site.title}</a>
+  <nav aria-label="主导航">
+    {nav.map((item) => <a href={item.href}>{item.label}</a>)}
+    <button class="theme-toggle" type="button" aria-label="切换明暗主题">
+      <span class="sun" aria-hidden="true">○</span>
+      <span class="moon" aria-hidden="true">●</span>
+    </button>
+  </nav>
+</header>
+
+<script is:inline>
+  document.querySelectorAll(".theme-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const root = document.documentElement;
+      const next = root.dataset.theme === "dark" ? "light" : "dark";
+      root.dataset.theme = next;
+      localStorage.setItem("cf-blog-theme", next);
+    });
+  });
+</script>

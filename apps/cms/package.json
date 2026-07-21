@@ -1,0 +1,38 @@
+{
+  "name": "@cf-blog/cms",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.worker.json --noEmit",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "deploy": "vite build && wrangler deploy --minify",
+    "dev:client": "vite",
+    "dev:worker": "wrangler dev --port 8787 --var ENVIRONMENT:development --var BLOG_URL:http://localhost:4321 --var MEDIA_BASE_URL:http://localhost:4321/media",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
+    "types": "wrangler types ./worker-configuration.d.ts"
+  },
+  "dependencies": {
+    "@cf-blog/contracts": "workspace:*",
+    "@cf-blog/markdown": "workspace:*",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@hono/zod-validator": "^0.9.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "agents": "^0.17.4",
+    "hono": "^4.12.31",
+    "jose": "^6.2.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "vite": "^8.1.5"
+  }
+}

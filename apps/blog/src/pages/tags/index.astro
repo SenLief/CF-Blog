@@ -1,0 +1,28 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+
+const [site, posts] = await Promise.all([
+  cms.site(),
+  cms.archive()
+]);
+const counts = new Map<string, number>();
+for (const post of posts) {
+  for (const tag of post.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+}
+---
+
+<BaseLayout site={site} title="标签">
+  <header class="section-hero">
+    <p class="kicker">Topics</p>
+    <h1>标签</h1>
+  </header>
+  <div class="tag-cloud">
+    {[...counts.entries()].sort(([a], [b]) => a.localeCompare(b, site.locale)).map(([tag, count]) => (
+      <a href={`/tags/${encodeURIComponent(tag)}`}>
+        <span>{tag}</span>
+        <small>{count}</small>
+      </a>
+    ))}
+  </div>
+</BaseLayout>

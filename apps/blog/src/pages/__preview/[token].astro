@@ -1,0 +1,29 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+import { formatDate } from "@/lib/format";
+
+const token = Astro.params.token ?? "";
+let post;
+try {
+  post = await cms.preview(token);
+} catch {
+  return Astro.redirect("/404", 302);
+}
+const site = await cms.site();
+---
+
+<BaseLayout site={site} title={`预览：${post.title}`} description={post.excerpt} noindex>
+  <div class="preview-banner">草稿预览 · 链接将在 10 分钟后失效</div>
+  <article class="post-page">
+    <header class="post-header">
+      <div class="post-meta">
+        <span>草稿</span>
+        <span>更新于 {formatDate(post.updatedAt, site.locale)}</span>
+      </div>
+      <h1>{post.title}</h1>
+    </header>
+    {post.coverUrl && <img class="post-cover" src={post.coverUrl} alt="" />}
+    <div class="prose" set:html={post.contentHtml} />
+  </article>
+</BaseLayout>

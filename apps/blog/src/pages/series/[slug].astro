@@ -1,0 +1,107 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+import { formatDate } from "@/lib/format";
+
+const PAGE_SIZE = 20;
+const slug = Astro.params.slug ?? "";
+const pageParam = Astro.url.searchParams.get("page");
+const page = pageParam === null ? 1 : Number(pageParam);
+const offset = (page - 1) * PAGE_SIZE;
+if (
+  (pageParam !== null && !/^[1-9]\d*$/.test(pageParam)) ||
+  !Number.isSafeInteger(page) ||
+  !Number.isSafeInteger(offset) ||
+  page < 1 ||
+  pageParam === "1"
+) {
+  return Astro.redirect(`/series/${encodeURIComponent(slug)}`, 302);
+}
+
+const [site, result] = await Promise.all([
+  cms.site(),
+  cms.group(slug, PAGE_SIZE + 1, offset)
+]);
+
+if (result.redirectTo) {
+  return Astro.redirect(
+    `/series/${encodeURIComponent(result.redirectTo)}${page > 1 ? `?page=${page}` : ""}`,
+    308
+  );
+}
+
+const group = result.group;
+if (!group) {
+  Astro.response.status = 404;
+}
+if (group && page > 1 && group.posts.length === 0) {
+  return Astro.redirect(
+    `/series/${encodeURIComponent(group.slug)}`,
+    302
+  );
+}
+
+const posts = group?.posts.slice(0, PAGE_SIZE) ?? [];
+const hasPreviousPage = page > 1;
+const hasNextPage = (group?.posts.length ?? 0) > PAGE_SIZE;
+const previousPageHref =
+  page === 2
+    ? `/series/${encodeURIComponent(group?.slug ?? slug)}`
+    : `/series/${encodeURIComponent(group?.slug ?? slug)}?page=${page - 1}`;
+const nextPageHref =
+  `/series/${encodeURIComponent(group?.slug ?? slug)}?page=${page + 1}`;
+---
+
+<BaseLayout
+  site={site}
+  title={group ? `${group.name}${page > 1 ? ` · 第 ${page} 页` : ""}` : "系列不存在"}
+  description={group?.description}
+  noindex={!group}
+>
+  {group ? (
+    <div class="series-page">
+      <header class="section-hero series-detail-hero">
+        <p class="kicker">Series · {String(group.sortOrder + 1).padStart(2, "0")}</p>
+        <h1>{group.name}</h1>
+        {group.description && <p>{group.description}</p>}
+        <small>{group.postCount} 篇文章</small>
+      </header>
+      <ol class="series-post-list" start={offset + 1}>
+        {posts.map((post, index) => (
+          <li>
+            <span class="series-post-number">
+              {String(offset + index + 1).padStart(2, "0")}
+            </span>
+            <a href={`/posts/${encodeURIComponent(post.slug)}`}>
+              <strong>{post.title}</strong>
+            </a>
+            <span class="series-post-meta">
+              <time datetime={post.publishedAt ?? post.updatedAt}>
+                {formatDate(post.publishedAt ?? post.updatedAt, site.locale)}
+              </time>
+              {site.showReadingTime && <span>{post.readingMinutes} 分钟</span>}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {(hasPreviousPage || hasNextPage) && (
+        <nav class="pagination series-pagination" aria-label="系列文章分页">
+          <div class="pagination-side">
+            {hasPreviousPage && <a href={previousPageHref} rel="prev">← 上一页</a>}
+          </div>
+          <span aria-current="page">第 {page} 页</span>
+          <div class="pagination-side pagination-next">
+            {hasNextPage && <a href={nextPageHref} rel="next">下一页 →</a>}
+          </div>
+        </nav>
+      )}
+    </div>
+  ) : (
+    <div class="not-found">
+      <span>404</span>
+      <h1>这个系列还没有写下。</h1>
+      <p>它可能被移动、删除，或者尚未公开。</p>
+      <a href="/series">返回系列</a>
+    </div>
+  )}
+</BaseLayout>

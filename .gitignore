@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.astro/
+.wrangler/
+.pnpm-store/
+.dev.vars
+.env
+.env.*
+!.env.example
+coverage/
+*.tsbuildinfo
+*.log
+.DS_Store
+.idea/
+.vscode/

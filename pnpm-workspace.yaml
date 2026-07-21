@@ -1,0 +1,16 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  core-js-pure: true
+  esbuild: true
+  sharp: true
+  workerd: true
+
+# partyserver 0.5.8 only advertises Workers types v4, while Agents and Wrangler
+# already consume v5. It is a type-only peer and the installed versions are
+# compatible; keep this scoped exception until the upstream range is updated.
+peerDependencyRules:
+  allowedVersions:
+    "@cloudflare/workers-types": "5"

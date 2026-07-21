@@ -1,0 +1,40 @@
+name: Bug 报告
+description: 报告可复现的问题；安全漏洞请使用私密安全报告。
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 请先确认问题不包含 Token、JWT、账号 ID 或其他敏感数据。
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 说明期望结果和实际结果。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开……
+        2. 点击……
+        3. 看到……
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: 版本或提交
+      description: 使用的 tag、commit SHA 或分支。
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      description: 浏览器、Node.js、pnpm、Wrangler 与部署方式。
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或截图
+      description: 请先移除凭证、域名和个人数据。

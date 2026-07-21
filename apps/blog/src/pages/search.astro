@@ -1,0 +1,19 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+
+const site = await cms.site();
+---
+
+<BaseLayout site={site} title="搜索">
+  <header class="section-hero search-hero">
+    <p class="kicker">Search</p>
+    <h1>搜索</h1>
+    <input type="search" placeholder="输入标题、摘要或标签…" autofocus data-search-input />
+  </header>
+  <div class="search-results" data-search-results>
+    <p class="empty-state">输入关键词开始搜索。</p>
+  </div>
+</BaseLayout>
+
+<script is:inline src="/scripts/search.js"></script>

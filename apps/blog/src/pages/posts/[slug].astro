@@ -1,0 +1,137 @@
+---
+import { isStandalonePageSlug } from "@cf-blog/contracts";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+import { formatDate } from "@/lib/format";
+
+const slug = Astro.params.slug ?? "";
+if (isStandalonePageSlug(slug)) {
+  return Astro.redirect("/about", 308);
+}
+const [site, result] = await Promise.all([
+  cms.site(),
+  cms.post(slug)
+]);
+if (result.redirectTo) {
+  return Astro.redirect(
+    isStandalonePageSlug(result.redirectTo)
+      ? "/about"
+      : `/posts/${result.redirectTo}`,
+    308
+  );
+}
+if (!result.post) {
+  return Astro.redirect("/404", 302);
+}
+const post = result.post;
+const series = post.seriesNavigation;
+const navigation = post.postNavigation;
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: post.title,
+  description: post.excerpt,
+  datePublished: post.publishedAt,
+  dateModified: post.updatedAt,
+  author: { "@type": "Person", name: site.authorName },
+  image: post.coverUrl || site.seoImageUrl || undefined,
+  isPartOf: series
+    ? {
+        "@type": "CollectionPage",
+        name: series.group.name,
+        url: new URL(
+          `/series/${encodeURIComponent(series.group.slug)}`,
+          Astro.url
+        ).href
+      }
+    : undefined
+};
+---
+
+<BaseLayout
+  site={site}
+  title={post.title}
+  description={post.excerpt}
+  image={post.coverUrl || site.seoImageUrl}
+  article
+>
+  <article class="post-page">
+    <header class="post-header">
+      <div class="post-meta">
+        <time datetime={post.publishedAt ?? post.updatedAt}>
+          {formatDate(post.publishedAt ?? post.updatedAt, site.locale)}
+        </time>
+        {site.showReadingTime && <span>{post.readingMinutes} 分钟阅读</span>}
+      </div>
+      <h1>{post.title}</h1>
+      {post.tags.length > 0 && (
+        <div class="tag-row">
+          {post.tags.map((tag) => <a href={`/tags/${encodeURIComponent(tag)}`}>#{tag}</a>)}
+        </div>
+      )}
+    </header>
+    {post.coverUrl && <img class="post-cover" src={post.coverUrl} alt="" />}
+    {(site.showToc || series) && (
+      <aside
+        class="article-sidebar"
+        data-article-sidebar
+        hidden={!series}
+      >
+        {site.showToc && <nav class="toc" aria-label="文章目录" data-toc hidden></nav>}
+        {series && (
+          <nav class="article-series" aria-label={`${series.group.name}系列文章`}>
+            <a
+              class="article-series-heading"
+              href={`/series/${encodeURIComponent(series.group.slug)}`}
+            >
+              <span>系列</span>
+              <strong>{series.group.name}</strong>
+              <small>{series.index + 1} / {series.total}</small>
+            </a>
+            <ol>
+              {series.posts.map((item, index) => (
+                <li>
+                  <a
+                    aria-current={item.slug === post.slug ? "page" : undefined}
+                    href={`/posts/${encodeURIComponent(item.slug)}`}
+                  >
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong>{item.title}</strong>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        )}
+      </aside>
+    )}
+    <div class="prose" data-article set:html={post.contentHtml} />
+    {(navigation.previous || navigation.next) && (
+      <nav class="post-navigation" aria-label="相邻文章">
+        {navigation.previous && (
+          <a
+            class="post-navigation-previous"
+            href={`/posts/${encodeURIComponent(navigation.previous.slug)}`}
+            rel="prev"
+          >
+            <span>← 上一篇</span>
+            <strong>{navigation.previous.title}</strong>
+          </a>
+        )}
+        {navigation.next && (
+          <a
+            class="post-navigation-next"
+            href={`/posts/${encodeURIComponent(navigation.next.slug)}`}
+            rel="next"
+          >
+            <span>下一篇 →</span>
+            <strong>{navigation.next.title}</strong>
+          </a>
+        )}
+      </nav>
+    )}
+  </article>
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+</BaseLayout>
+
+<script is:inline src="/scripts/article.js"></script>

@@ -1,0 +1,16 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+
+Astro.response.status = 404;
+const site = await cms.site();
+---
+
+<BaseLayout site={site} title="页面不存在" noindex>
+  <div class="not-found">
+    <span>404</span>
+    <h1>这一页是空白的。</h1>
+    <p>它可能被移动、归档，或者从未写下。</p>
+    <a href="/">返回首页</a>
+  </div>
+</BaseLayout>

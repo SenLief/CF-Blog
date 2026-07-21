@@ -1,0 +1,36 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+import { formatDate } from "@/lib/format";
+
+const [site, posts] = await Promise.all([
+  cms.site(),
+  cms.archive()
+]);
+const groups = Map.groupBy(posts, (post) =>
+  new Date(post.publishedAt ?? post.updatedAt).getFullYear()
+);
+---
+
+<BaseLayout site={site} title="归档" description={`浏览 ${site.title} 的全部文章`}>
+  <header class="section-hero">
+    <p class="kicker">Archive</p>
+    <h1>归档</h1>
+    <p>共 {posts.length} 篇公开文章。</p>
+  </header>
+  <div class="archive-list">
+    {[...groups.entries()].sort(([a], [b]) => b - a).map(([year, items]) => (
+      <section>
+        <h2>{year}</h2>
+        <div>
+          {items.map((post) => (
+            <a href={`/posts/${post.slug}`}>
+              <time>{formatDate(post.publishedAt ?? post.updatedAt, site.locale)}</time>
+              <strong>{post.title}</strong>
+            </a>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+</BaseLayout>

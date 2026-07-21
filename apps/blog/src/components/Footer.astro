@@ -1,0 +1,25 @@
+---
+import type { SiteSettings } from "@cf-blog/contracts";
+
+interface Props {
+  site: SiteSettings;
+}
+
+const { site } = Astro.props;
+---
+
+<footer class="site-footer">
+  <div>
+    <strong>{site.title}</strong>
+    <span>© {new Date().getFullYear()} {site.authorName}</span>
+  </div>
+  {site.social.length > 0 && (
+    <nav aria-label="社交链接">
+      {site.social.map((item) => (
+        <a href={item.href} rel="me noopener noreferrer" target="_blank">
+          {item.label}
+        </a>
+      ))}
+    </nav>
+  )}
+</footer>

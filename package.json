@@ -1,0 +1,35 @@
+{
+  "name": "cf-blog",
+  "version": "0.1.0",
+  "description": "A Cloudflare-native personal blog with an Astro frontend, React CMS, D1, R2, and MCP support.",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "packageManager": "pnpm@11.15.1",
+  "scripts": {
+    "build": "pnpm --filter @cf-blog/contracts typecheck && pnpm --filter @cf-blog/markdown typecheck && pnpm --filter @cf-blog/cms build && pnpm --filter @cf-blog/blog build",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "dev": "concurrently -n cms,admin,blog -c blue,magenta,green \"pnpm --filter @cf-blog/cms dev:worker\" \"pnpm --filter @cf-blog/cms dev:client\" \"pnpm --filter @cf-blog/blog dev\"",
+    "dev:cms": "pnpm --filter @cf-blog/cms dev:worker",
+    "dev:admin": "pnpm --filter @cf-blog/cms dev:client",
+    "dev:blog": "pnpm --filter @cf-blog/blog dev",
+    "db:migrate:local": "pnpm --filter @cf-blog/cms db:migrate:local",
+    "db:migrate:remote": "pnpm --filter @cf-blog/cms db:migrate:remote",
+    "db:seed:demo": "node scripts/seed-demo-posts.mjs --remote",
+    "db:seed:demo:local": "node scripts/seed-demo-posts.mjs --local",
+    "deploy": "pnpm check && pnpm db:migrate:remote && pnpm --filter @cf-blog/cms deploy && pnpm --filter @cf-blog/blog deploy",
+    "test": "vitest run",
+    "typecheck": "pnpm --filter @cf-blog/contracts typecheck && pnpm --filter @cf-blog/markdown typecheck && pnpm --filter @cf-blog/cms typecheck && pnpm --filter @cf-blog/blog typecheck",
+    "types": "pnpm --filter @cf-blog/cms types && pnpm --filter @cf-blog/blog types"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260719.1",
+    "@types/node": "^26.1.1",
+    "concurrently": "^10.0.3",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.112.0"
+  }
+}

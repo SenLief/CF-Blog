@@ -1,0 +1,57 @@
+---
+import PostList from "@/components/PostList.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+
+const PAGE_SIZE = 5;
+const pageParam = Astro.url.searchParams.get("page");
+const page = pageParam === null ? 1 : Number(pageParam);
+const offset = (page - 1) * PAGE_SIZE;
+
+if (
+  (pageParam !== null && !/^[1-9]\d*$/.test(pageParam)) ||
+  !Number.isSafeInteger(page) ||
+  !Number.isSafeInteger(offset) ||
+  page < 1 ||
+  pageParam === "1"
+) {
+  return Astro.redirect("/", 302);
+}
+
+const [site, pagePosts] = await Promise.all([
+  cms.site(),
+  cms.posts(PAGE_SIZE + 1, offset)
+]);
+
+if (page > 1 && pagePosts.length === 0) {
+  return Astro.redirect("/", 302);
+}
+
+const posts = pagePosts.slice(0, PAGE_SIZE);
+const hasPreviousPage = page > 1;
+const hasNextPage = pagePosts.length > PAGE_SIZE;
+const previousPageHref = page === 2 ? "/" : `/?page=${page - 1}`;
+const nextPageHref = `/?page=${page + 1}`;
+---
+
+<BaseLayout site={site} title={page > 1 ? `第 ${page} 页` : undefined}>
+  <section class="home-intro">
+    <p class="kicker">{site.authorName}</p>
+    <h1>{site.description}</h1>
+    {site.authorBio && <p>{site.authorBio}</p>}
+  </section>
+  <section class="home-posts" aria-label="最新文章">
+    <PostList posts={posts} site={site} />
+    {(hasPreviousPage || hasNextPage) && (
+      <nav class="pagination" aria-label="文章分页">
+        <div class="pagination-side">
+          {hasPreviousPage && <a href={previousPageHref} rel="prev">← 上一页</a>}
+        </div>
+        <span aria-current="page">第 {page} 页</span>
+        <div class="pagination-side pagination-next">
+          {hasNextPage && <a href={nextPageHref} rel="next">下一页 →</a>}
+        </div>
+      </nav>
+    )}
+  </section>
+</BaseLayout>

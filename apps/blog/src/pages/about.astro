@@ -1,0 +1,62 @@
+---
+import { ABOUT_PAGE_SLUG } from "@cf-blog/contracts";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+
+const [site, result] = await Promise.all([
+  cms.site(),
+  cms.post(ABOUT_PAGE_SLUG)
+]);
+const post = result.post;
+if (!post) Astro.response.status = 404;
+const structuredData = post
+  ? {
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      name: post.title,
+      description: post.excerpt,
+      dateModified: post.updatedAt,
+      author: { "@type": "Person", name: site.authorName }
+    }
+  : null;
+---
+
+<BaseLayout
+  site={site}
+  title={post?.title ?? "页面不存在"}
+  description={post?.excerpt}
+  image={post?.coverUrl || site.seoImageUrl}
+  noindex={!post}
+>
+  {post ? (
+    <article class="about-page">
+      <header>
+        <p class="kicker">About</p>
+        <h1>{post.title}</h1>
+      </header>
+      {post.coverUrl && <img class="about-cover" src={post.coverUrl} alt="" />}
+      <div class="prose" set:html={post.contentHtml} />
+      {site.social.length > 0 && (
+        <nav class="about-links" aria-label="社交链接">
+          {site.social.map((item) => (
+            <a href={item.href} target="_blank" rel="me noopener noreferrer">
+              {item.label} ↗
+            </a>
+          ))}
+        </nav>
+      )}
+    </article>
+  ) : (
+    <div class="not-found">
+      <span>404</span>
+      <h1>关于页面尚未发布。</h1>
+      <p>请在后台创建文章，将 Slug 设为 about 后发布。</p>
+      <a href="/">返回首页</a>
+    </div>
+  )}
+  {structuredData && (
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+  )}
+</BaseLayout>
+
+{post && <script is:inline src="/scripts/article.js"></script>}
