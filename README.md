@@ -4,6 +4,16 @@
 
 > 项目处于首个可用版本，适合个人部署和二次开发。正式使用前请完成 Cloudflare Access 配置，并自行评估数据备份与升级策略。
 
+## 界面预览
+
+| 博客首页 | 文章详情 |
+| --- | --- |
+| ![博客首页](docs/images/blog-home.jpg) | ![公开文章详情](docs/images/blog-post.jpg) |
+
+| 后台概览 | 文章编辑器 |
+| --- | --- |
+| ![CMS 后台概览](docs/images/cms-dashboard.jpg) | ![CMS 文章编辑器](docs/images/cms-editor.jpg) |
+
 ## 特性
 
 ### 博客前台
@@ -207,6 +217,8 @@ pnpm deploy
 CMS Worker 在 `/mcp` 提供文章管理工具，并复用同一套 Access 鉴权、D1 服务和版本冲突控制。建议为自动化客户端创建独立的 Cloudflare Access Service Token；不要复用浏览器身份或将 Token 提交到仓库。
 
 配置示例、工具边界与凭证轮换见 [Codex MCP 接入与运维](docs/codex-mcp.md)。
+
+日常写作、媒体管理、分组、站点设置与本地调试流程见 [后端（CMS）功能使用指南](docs/backend-usage.md)。
 
 ## 常用命令
 
