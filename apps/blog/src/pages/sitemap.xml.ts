@@ -4,13 +4,21 @@ import { cms } from "@/lib/cms";
 import { escapeXml } from "@/lib/format";
 
 export const GET: APIRoute = async ({ request }) => {
-  const [posts, groups, about] = await Promise.all([
+  const [site, posts, groups, about] = await Promise.all([
+    cms.site(),
     cms.archive(),
     cms.groups(),
     cms.post(ABOUT_PAGE_SLUG)
   ]);
   const origin = new URL(request.url).origin;
-  const paths = ["/", "/archives", "/tags", "/series", "/search"];
+  const paths = [
+    "/",
+    ...(site.enableMemos ? ["/memo"] : []),
+    "/archives",
+    "/tags",
+    "/series",
+    "/search"
+  ];
   const urls = [
     ...paths.map((path) => ({ loc: `${origin}${path}`, modified: null })),
     ...(about.post

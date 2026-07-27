@@ -10,6 +10,7 @@ import {
 } from "./db";
 import { sha256Hex } from "./http";
 import { serveMedia } from "./media";
+import { listMemos } from "./memo-service";
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -53,6 +54,25 @@ export class ContentService extends WorkerEntrypoint<Env> {
         await listPosts(this.env.DB, {
           status: "published",
           excludeStandalonePages: true,
+          limit,
+          offset
+        })
+      );
+    }
+
+    if (url.pathname === "/memos") {
+      const settings = await getSiteSettings(
+        this.env.DB,
+        this.env.MEDIA_BASE_URL
+      );
+      if (!settings.enableMemos) {
+        return json({ error: "Not found" }, 404);
+      }
+      const limit = integerParam(url, "limit", 20, 1, 100);
+      const offset = integerParam(url, "offset", 0, 0);
+      return json(
+        await listMemos(this.env.DB, this.env.MEDIA_BASE_URL, {
+          status: "published",
           limit,
           offset
         })

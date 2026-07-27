@@ -3,6 +3,187 @@ import { z } from "zod";
 export const postStatusSchema = z.enum(["draft", "published", "archived"]);
 export type PostStatus = z.infer<typeof postStatusSchema>;
 
+export const memoStatusSchema = z.enum(["draft", "published"]);
+export type MemoStatus = z.infer<typeof memoStatusSchema>;
+
+const memoContentSchema = z.string().trim().max(20_000);
+const memoTagsSchema = z
+  .array(z.string().trim().min(1).max(40))
+  .max(8)
+  .superRefine((tags, context) => {
+    if (new Set(tags.map((tag) => tag.toLocaleLowerCase())).size !== tags.length) {
+      context.addIssue({ code: "custom", message: "标签不能重复" });
+    }
+  });
+const memoImageIdsSchema = z
+  .array(z.string().uuid())
+  .max(9)
+  .superRefine((ids, context) => {
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: "custom", message: "图片不能重复" });
+    }
+  });
+const memoVideoUrlsSchema = z
+  .array(z.string().trim().min(1).max(2048))
+  .max(4)
+  .superRefine((urls, context) => {
+    const normalized = new Set<string>();
+    urls.forEach((url, index) => {
+      const source = normalizeVideoSource(url);
+      if (!source) {
+        context.addIssue({
+          code: "custom",
+          message: "仅支持 YouTube、Bilibili、Vimeo 完整链接或 HTTPS MP4/WebM 直链",
+          path: [index]
+        });
+      } else if (normalized.has(source.sourceUrl)) {
+        context.addIssue({ code: "custom", message: "视频不能重复", path: [index] });
+      } else {
+        normalized.add(source.sourceUrl);
+      }
+    });
+  });
+
+export interface MemoContentPart {
+  type: "text" | "tag";
+  value: string;
+}
+
+const memoTagCharacter = /[\p{L}\p{N}_-]/u;
+const memoTagStartBoundary = /[\p{L}\p{N}_#-]/u;
+const memoTagPattern = /#([\p{L}\p{N}_-]{1,40})/gu;
+
+export function memoContentParts(content: string): MemoContentPart[] {
+  const parts: MemoContentPart[] = [];
+  let textStart = 0;
+
+  for (const match of content.matchAll(memoTagPattern)) {
+    const index = match.index;
+    const value = match[0];
+    const before = index > 0 ? content[index - 1] ?? "" : "";
+    const after = content[index + value.length] ?? "";
+    if (
+      (before && memoTagStartBoundary.test(before)) ||
+      (after && memoTagCharacter.test(after))
+    ) {
+      continue;
+    }
+    if (index > textStart) {
+      parts.push({ type: "text", value: content.slice(textStart, index) });
+    }
+    parts.push({ type: "tag", value });
+    textStart = index + value.length;
+  }
+
+  if (textStart < content.length) {
+    parts.push({ type: "text", value: content.slice(textStart) });
+  }
+  return parts;
+}
+
+export function extractMemoTags(content: string): string[] {
+  const tags: string[] = [];
+  const normalized = new Set<string>();
+  for (const part of memoContentParts(content)) {
+    if (part.type !== "tag") continue;
+    const tag = part.value.slice(1);
+    const key = tag.toLocaleLowerCase();
+    if (normalized.has(key)) continue;
+    normalized.add(key);
+    tags.push(tag);
+  }
+  return tags;
+}
+
+function validateInlineMemoTags(
+  input: { content: string },
+  context: z.RefinementCtx
+): void {
+  if (extractMemoTags(input.content).length > 8) {
+    context.addIssue({
+      code: "custom",
+      message: "每条短文最多使用 8 个标签",
+      path: ["tags"]
+    });
+  }
+}
+
+function validateMemoContent(
+  input: { content: string; imageIds: string[]; videoUrls: string[] },
+  context: z.RefinementCtx
+): void {
+  if (!input.content && input.imageIds.length === 0 && input.videoUrls.length === 0) {
+    context.addIssue({
+      code: "custom",
+      message: "请输入内容，或添加至少一张图片或一个视频",
+      path: ["content"]
+    });
+  }
+}
+
+export const memoCreateSchema = z
+  .object({
+    content: memoContentSchema.default(""),
+    tags: memoTagsSchema.default([]),
+    imageIds: memoImageIdsSchema.default([]),
+    videoUrls: memoVideoUrlsSchema.default([]),
+    status: memoStatusSchema.default("published")
+  })
+  .superRefine((input, context) => {
+    validateMemoContent(input, context);
+    validateInlineMemoTags(input, context);
+  })
+  .transform((input) => ({ ...input, tags: extractMemoTags(input.content) }));
+export type MemoCreateInput = z.infer<typeof memoCreateSchema>;
+
+export const memoInputSchema = z
+  .object({
+    content: memoContentSchema,
+    tags: memoTagsSchema,
+    imageIds: memoImageIdsSchema,
+    videoUrls: memoVideoUrlsSchema,
+    status: memoStatusSchema,
+    isPinned: z.boolean(),
+    version: z.number().int().nonnegative()
+  })
+  .superRefine((input, context) => {
+    validateMemoContent(input, context);
+    validateInlineMemoTags(input, context);
+  })
+  .transform((input) => ({ ...input, tags: extractMemoTags(input.content) }));
+export type MemoInput = z.infer<typeof memoInputSchema>;
+
+export interface MemoImage {
+  id: string;
+  url: string;
+  filename: string;
+  mimeType: string;
+  bytes: number;
+  alt: string;
+  width: number | null;
+  height: number | null;
+}
+
+export interface MemoVideo {
+  sourceUrl: string;
+  provider: VideoProvider;
+  preview: VideoPreview;
+}
+
+export interface Memo {
+  id: string;
+  content: string;
+  tags: string[];
+  images: MemoImage[];
+  videos: MemoVideo[];
+  status: MemoStatus;
+  isPinned: boolean;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
 export const ABOUT_PAGE_SLUG = "about";
 
 export function isStandalonePageSlug(input: string): boolean {
@@ -83,6 +264,8 @@ export const siteSettingsSchema = z.object({
   defaultTheme: z.enum(["system", "light", "dark"]),
   showToc: z.boolean(),
   showReadingTime: z.boolean(),
+  enableMemos: z.boolean(),
+  memoDescription: z.string().trim().max(320),
   faviconMediaId: z.string().uuid().nullable(),
   nav: z.array(
     z.object({

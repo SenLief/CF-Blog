@@ -1,6 +1,9 @@
 import {
   externalVideoInputSchema,
   groupInputSchema,
+  memoCreateSchema,
+  memoInputSchema,
+  memoStatusSchema,
   normalizeVideoSource,
   postBulkActionSchema,
   postInputSchema,
@@ -41,6 +44,12 @@ import {
 import { handleMcpRequest } from "./mcp";
 import { serveMedia } from "./media";
 import {
+  createMemo,
+  deleteMemo,
+  listMemos,
+  updateMemo
+} from "./memo-service";
+import {
   changePostStatus,
   createDraft,
   updatePost
@@ -63,6 +72,15 @@ const allowedMediaTypes = new Map([
   ["image/webp", "webp"],
   ["image/avif", "avif"]
 ]);
+
+async function requireMemosEnabled(db: D1Database): Promise<void> {
+  const settings = await db.prepare(
+    "SELECT enable_memos FROM site_settings WHERE id = 1"
+  ).first<{ enable_memos: number }>();
+  if (settings?.enable_memos !== 1) {
+    throw new AppError(404, "MEMOS_DISABLED", "短文功能未启用");
+  }
+}
 
 app.use("*", async (c, next) => {
   const requestId = c.req.header("Cf-Ray") ?? crypto.randomUUID();
@@ -125,8 +143,28 @@ app.get("/api/overview", async (c) => {
   });
 });
 
-app.get("/api/settings", async (c) =>
-  c.json(await getSiteSettings(c.env.DB, c.env.MEDIA_BASE_URL))
+app.get("/api/settings", async (c) => {
+  c.header("Cache-Control", "private, no-store");
+  return c.json(await getSiteSettings(c.env.DB, c.env.MEDIA_BASE_URL));
+});
+
+app.put(
+  "/api/settings/memos",
+  zValidator("json", z.object({ enableMemos: z.boolean() })),
+  async (c) => {
+    const { enableMemos } = c.req.valid("json");
+    await c.env.DB.prepare(
+      `UPDATE site_settings
+       SET enable_memos = ?, updated_at = ?
+       WHERE id = 1`
+    )
+      .bind(enableMemos ? 1 : 0, nowIso())
+      .run();
+    c.header("Cache-Control", "private, no-store");
+    return c.json(
+      await getSiteSettings(c.env.DB, c.env.MEDIA_BASE_URL)
+    );
+  }
 );
 
 app.put(
@@ -153,8 +191,9 @@ app.put(
       `UPDATE site_settings SET
         title = ?, description = ?, author_name = ?, author_bio = ?,
         locale = ?, timezone = ?, accent = ?, default_theme = ?,
-        show_toc = ?, show_reading_time = ?, nav_json = ?, social_json = ?,
-        favicon_media_id = ?, seo_image_url = ?, updated_at = ?
+        show_toc = ?, show_reading_time = ?, enable_memos = ?, memo_description = ?,
+        nav_json = ?, social_json = ?, favicon_media_id = ?,
+        seo_image_url = ?, updated_at = ?
        WHERE id = 1`
     )
       .bind(
@@ -168,6 +207,8 @@ app.put(
         input.defaultTheme,
         input.showToc ? 1 : 0,
         input.showReadingTime ? 1 : 0,
+        input.enableMemos ? 1 : 0,
+        input.memoDescription,
         JSON.stringify(input.nav),
         JSON.stringify(input.social),
         input.faviconMediaId,
@@ -175,6 +216,7 @@ app.put(
         updatedAt
       )
       .run();
+    c.header("Cache-Control", "private, no-store");
     return c.json(
       await getSiteSettings(c.env.DB, c.env.MEDIA_BASE_URL)
     );
@@ -240,6 +282,64 @@ app.delete("/api/groups/:id", async (c) => {
   await deleteGroup(c.env.DB, c.req.param("id"));
   return c.body(null, 204);
 });
+
+app.get("/api/memos", async (c) => {
+  await requireMemosEnabled(c.env.DB);
+  const statusValue = c.req.query("status");
+  const statusResult = statusValue
+    ? memoStatusSchema.safeParse(statusValue)
+    : null;
+  if (statusValue && !statusResult?.success) {
+    throw new AppError(422, "INVALID_MEMO_STATUS", "短文状态无效");
+  }
+  return c.json(
+    await listMemos(c.env.DB, c.env.MEDIA_BASE_URL, {
+      status: statusResult?.success ? statusResult.data : undefined,
+      query: c.req.query("q")?.trim() || undefined
+    })
+  );
+});
+
+app.post(
+  "/api/memos",
+  zValidator("json", memoCreateSchema),
+  async (c) => {
+    await requireMemosEnabled(c.env.DB);
+    return c.json(
+      await createMemo(
+        c.env.DB,
+        c.env.MEDIA_BASE_URL,
+        c.req.valid("json")
+      ),
+      201
+    );
+  }
+);
+
+app.put(
+  "/api/memos/:id",
+  zValidator("json", memoInputSchema),
+  async (c) => {
+    await requireMemosEnabled(c.env.DB);
+    return c.json(
+      await updateMemo(
+        c.env.DB,
+        c.req.param("id"),
+        c.env.MEDIA_BASE_URL,
+        c.req.valid("json")
+      )
+    );
+  }
+);
+
+app.delete(
+  "/api/memos/:id",
+  async (c) => {
+    await requireMemosEnabled(c.env.DB);
+    await deleteMemo(c.env.DB, c.req.param("id"));
+    return c.body(null, 204);
+  }
+);
 
 app.get("/api/posts", async (c) => {
   const statusValue = c.req.query("status");
@@ -561,10 +661,16 @@ app.delete("/api/media/:id", async (c) => {
   if (referenced) {
     throw new AppError(409, "MEDIA_IN_USE", "该图片仍被文章引用");
   }
-  await Promise.all([
-    c.env.MEDIA.delete(item.object_key),
-    c.env.DB.prepare("DELETE FROM media WHERE id = ?").bind(mediaId).run()
-  ]);
+  const memoReference = await c.env.DB.prepare(
+    "SELECT memo_id FROM memo_images WHERE media_id = ? LIMIT 1"
+  )
+    .bind(mediaId)
+    .first<{ memo_id: string }>();
+  if (memoReference) {
+    throw new AppError(409, "MEDIA_IN_USE", "该图片仍被短文引用");
+  }
+  await c.env.DB.prepare("DELETE FROM media WHERE id = ?").bind(mediaId).run();
+  await c.env.MEDIA.delete(item.object_key);
   return c.body(null, 204);
 });
 

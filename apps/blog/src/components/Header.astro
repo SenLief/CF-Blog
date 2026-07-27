@@ -7,6 +7,7 @@ interface Props {
 
 const { site } = Astro.props;
 const defaultNav = [
+  { label: "Memo", href: "/memo" },
   { label: "归档", href: "/archives" },
   { label: "标签", href: "/tags" },
   { label: "系列", href: "/series" },
@@ -14,20 +15,31 @@ const defaultNav = [
   { label: "关于", href: "/about" }
 ];
 const configuredNav = site.nav.length > 0 ? site.nav : defaultNav;
-const hasSeries = configuredNav.some(
+const memoAwareNav = site.enableMemos
+  ? configuredNav
+  : configuredNav.filter(
+      (item) => item.href.replace(/\/+$/, "") !== "/memo"
+    );
+const hasMemo = memoAwareNav.some(
+  (item) => item.href.replace(/\/+$/, "") === "/memo"
+);
+const navWithMemo = site.enableMemos && !hasMemo
+  ? [{ label: "Memo", href: "/memo" }, ...memoAwareNav]
+  : memoAwareNav;
+const hasSeries = navWithMemo.some(
   (item) => item.href.replace(/\/+$/, "") === "/series"
 );
-const insertionIndex = configuredNav.findIndex(
+const insertionIndex = navWithMemo.findIndex(
   (item) =>
     item.href.replace(/\/+$/, "") === "/search" ||
     item.href.replace(/\/+$/, "") === "/about"
 );
 const nav = hasSeries
-  ? configuredNav
+  ? navWithMemo
   : [
-      ...configuredNav.slice(0, insertionIndex < 0 ? configuredNav.length : insertionIndex),
+      ...navWithMemo.slice(0, insertionIndex < 0 ? navWithMemo.length : insertionIndex),
       { label: "系列", href: "/series" },
-      ...configuredNav.slice(insertionIndex < 0 ? configuredNav.length : insertionIndex)
+      ...navWithMemo.slice(insertionIndex < 0 ? navWithMemo.length : insertionIndex)
     ];
 ---
 

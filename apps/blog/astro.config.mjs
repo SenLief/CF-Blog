@@ -8,6 +8,9 @@ export default defineConfig({
   }),
   compressHTML: true,
   vite: {
+    optimizeDeps: {
+      exclude: ["zod"]
+    },
     build: {
       sourcemap: true
     }

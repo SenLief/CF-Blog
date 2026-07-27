@@ -6,6 +6,9 @@ import type {
   GroupSummary,
   ImageMediaItem,
   MediaItem,
+  Memo,
+  MemoCreateInput,
+  MemoInput,
   PostBulkAction,
   PostBulkActionResult,
   PostDetail,
@@ -58,11 +61,38 @@ export const api = {
       recent: PostSummary[];
     }>("/api/overview"),
 
-  getSettings: () => request<SiteSettings>("/api/settings"),
+  getSettings: () =>
+    request<SiteSettings>("/api/settings", { cache: "no-store" }),
   saveSettings: (input: SiteSettingsInput) =>
     request<SiteSettings>("/api/settings", {
       method: "PUT",
       body: JSON.stringify(input)
+    }),
+  setMemosEnabled: (enableMemos: boolean) =>
+    request<SiteSettings>("/api/settings/memos", {
+      method: "PUT",
+      body: JSON.stringify({ enableMemos })
+    }),
+
+  listMemos: (status?: string, query?: string) => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (query) params.set("q", query);
+    return request<Memo[]>(`/api/memos?${params}`);
+  },
+  createMemo: (input: MemoCreateInput) =>
+    request<Memo>("/api/memos", {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  saveMemo: (id: string, input: MemoInput) =>
+    request<Memo>(`/api/memos/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input)
+    }),
+  deleteMemo: (id: string) =>
+    request<void>(`/api/memos/${id}`, {
+      method: "DELETE"
     }),
 
   listGroups: () => request<GroupSummary[]>("/api/groups"),

@@ -1,6 +1,7 @@
 import type {
   GroupDetail,
   GroupSummary,
+  Memo,
   PostDetail,
   PublicPostDetail,
   PostSummary,
@@ -27,6 +28,8 @@ async function json<T>(path: string): Promise<T> {
 
 export const cms = {
   site: () => json<SiteSettings>("/site"),
+  memos: (limit = 20, offset = 0) =>
+    json<Memo[]>(`/memos?limit=${limit}&offset=${offset}`),
   posts: (limit = 20, offset = 0) =>
     json<PostSummary[]>(`/posts?limit=${limit}&offset=${offset}`),
   groups: () => json<GroupSummary[]>("/groups"),

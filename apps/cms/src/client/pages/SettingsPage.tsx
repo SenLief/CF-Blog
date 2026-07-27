@@ -29,6 +29,7 @@ export function SettingsPage() {
   const [socialLines, setSocialLines] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savingMemos, setSavingMemos] = useState(false);
 
   useEffect(() => {
     void api
@@ -106,6 +107,33 @@ export function SettingsPage() {
     }
   };
 
+  const setMemosEnabled = async (enableMemos: boolean) => {
+    const previous = settings;
+    setSavingMemos(true);
+    setMessage("");
+    setSettings({ ...settings, enableMemos });
+    try {
+      const saved = await api.setMemosEnabled(enableMemos);
+      setSettings((current) =>
+        current
+          ? {
+              ...current,
+              enableMemos: saved.enableMemos,
+              updatedAt: saved.updatedAt
+            }
+          : saved
+      );
+      notifySiteSettingsUpdated(saved);
+      setMessage(enableMemos ? "短文功能已开启。" : "短文功能已关闭。");
+    } catch (reason) {
+      setSettings(previous);
+      notifySiteSettingsUpdated(previous);
+      setMessage(reason instanceof Error ? reason.message : "短文功能设置失败");
+    } finally {
+      setSavingMemos(false);
+    }
+  };
+
   return (
     <>
       <div className="page settings-page">
@@ -115,7 +143,7 @@ export function SettingsPage() {
             <h1>博客设置</h1>
             <p>这里的配置会直接影响公开博客。</p>
           </div>
-          <button className="button primary" disabled={saving} onClick={() => void save()}>
+          <button className="button primary" disabled={saving || savingMemos} onClick={() => void save()}>
             {saving ? "保存中…" : "保存设置"}
           </button>
         </header>
@@ -197,9 +225,53 @@ export function SettingsPage() {
           </section>
 
           <section className="settings-section">
+            <h2>功能</h2>
+            <label className="feature-toggle">
+              <span>
+                <strong>短文功能</strong>
+                <small>启用后台短文管理、公开 Memo 页面和相关导航。</small>
+              </span>
+              <input
+                aria-label="启用短文功能"
+                checked={settings.enableMemos}
+                disabled={saving || savingMemos}
+                onChange={(event) => void setMemosEnabled(event.target.checked)}
+                type="checkbox"
+              />
+              <i aria-hidden="true" />
+            </label>
+            <p className="feature-toggle-help">
+              {savingMemos
+                ? "正在保存短文功能设置…"
+                : "开关会立即生效；关闭后已有短文仍会保留。"}
+            </p>
+            {settings.enableMemos && (
+              <div className="memo-feature-settings">
+                <label>
+                  短文介绍
+                  <textarea
+                    maxLength={320}
+                    onChange={(event) =>
+                      update("memoDescription", event.target.value)
+                    }
+                    placeholder="介绍这组轻量记录"
+                    rows={3}
+                    value={settings.memoDescription}
+                  />
+                </label>
+                <p>
+                  公开页作者：
+                  <strong>{settings.authorName.trim() || settings.title}</strong>
+                  ，可在“基本信息 → 作者”中修改。
+                </p>
+              </div>
+            )}
+          </section>
+
+          <section className="settings-section">
             <h2>导航</h2>
             <p className="field-help">每行使用“名称|地址”，相对地址可指向博客内部。</p>
-            <textarea rows={7} value={navLines} onChange={(e) => setNavLines(e.target.value)} placeholder={"归档|/archives\n关于|/about"} />
+            <textarea rows={7} value={navLines} onChange={(e) => setNavLines(e.target.value)} placeholder={"Memo|/memo\n归档|/archives\n关于|/about"} />
           </section>
 
           <section className="settings-section">

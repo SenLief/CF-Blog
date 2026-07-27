@@ -1,0 +1,169 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cms } from "@/lib/cms";
+import { memoContentParts } from "@cf-blog/contracts";
+
+const PAGE_SIZE = 20;
+const pageParam = Astro.url.searchParams.get("page");
+const page = pageParam === null ? 1 : Number(pageParam);
+const offset = (page - 1) * PAGE_SIZE;
+
+if (
+  (pageParam !== null && !/^[1-9]\d*$/.test(pageParam)) ||
+  !Number.isSafeInteger(page) ||
+  !Number.isSafeInteger(offset) ||
+  page < 1 ||
+  pageParam === "1"
+) {
+  return Astro.redirect("/memo", 302);
+}
+
+const site = await cms.site();
+
+if (!site.enableMemos) {
+  return new Response("Not found", { status: 404 });
+}
+
+const pageMemos = await cms.memos(PAGE_SIZE + 1, offset);
+
+if (page > 1 && pageMemos.length === 0) {
+  return Astro.redirect("/memo", 302);
+}
+
+const memos = pageMemos.slice(0, PAGE_SIZE);
+const hasPreviousPage = page > 1;
+const hasNextPage = pageMemos.length > PAGE_SIZE;
+const previousPageHref = page === 2 ? "/memo" : `/memo?page=${page - 1}`;
+const nextPageHref = `/memo?page=${page + 1}`;
+const author = site.authorName.trim() || site.title;
+const authorMark = Array.from(author.trim())[0] ?? "M";
+
+function formatMemoDate(value: string): string {
+  const options: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  };
+  try {
+    return new Intl.DateTimeFormat(site.locale, {
+      ...options,
+      timeZone: site.timezone
+    }).format(new Date(value));
+  } catch {
+    return new Intl.DateTimeFormat(site.locale, options).format(new Date(value));
+  }
+}
+
+function providerLabel(provider: string): string {
+  return {
+    youtube: "YouTube",
+    bilibili: "Bilibili",
+    vimeo: "Vimeo",
+    direct: "视频"
+  }[provider] ?? "视频";
+}
+---
+
+<BaseLayout
+  site={site}
+  title={`短文${page > 1 ? ` · 第 ${page} 页` : ""}`}
+  description={site.memoDescription || `${site.title} 的短文与即时想法`}
+>
+  <section class="memo-page">
+    <header class="section-hero memo-hero">
+      <p class="kicker">Memos</p>
+      <h1>短文</h1>
+      {site.memoDescription && <p>{site.memoDescription}</p>}
+    </header>
+
+    <div class="memo-timeline" aria-label="短文时间轴">
+      {memos.map((memo) => {
+        const timestamp = memo.publishedAt ?? memo.createdAt;
+        return (
+          <article class="memo-entry">
+            <div class="memo-rail" aria-hidden="true"><span /></div>
+            <div class="memo-card">
+              <header class="memo-card-header">
+                <div class="memo-public-author">
+                  <span aria-hidden="true">{authorMark}</span>
+                  <div>
+                    <strong>{author}</strong>
+                    <time datetime={timestamp}>{formatMemoDate(timestamp)}</time>
+                  </div>
+                </div>
+                {memo.isPinned && <span class="memo-pinned">置顶</span>}
+              </header>
+              {memo.content && (
+                <p class="memo-content">
+                  {memoContentParts(memo.content).map((part) =>
+                    part.type === "tag" ? (
+                      <span class="memo-inline-tag">{part.value}</span>
+                    ) : part.value
+                  )}
+                </p>
+              )}
+              {(memo.images.length > 0 || memo.videos.length > 0) && (
+                <div class="memo-media">
+                  {memo.images.length > 0 && (
+                    <div class={`memo-gallery memo-gallery-${Math.min(memo.images.length, 4)}`}>
+                      {memo.images.map((image) => (
+                        <a href={image.url} target="_blank" rel="noreferrer">
+                          <img
+                            alt={image.alt || "短文图片"}
+                            height={image.height ?? undefined}
+                            loading="lazy"
+                            src={image.url}
+                            width={image.width ?? undefined}
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {memo.videos.map((video) => (
+                    <figure class="memo-video">
+                      <div class="memo-video-frame">
+                        {video.preview.kind === "iframe" ? (
+                          <iframe
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowfullscreen
+                            loading="lazy"
+                            referrerpolicy="strict-origin-when-cross-origin"
+                            src={video.preview.url}
+                            title={`${providerLabel(video.provider)} 视频预览`}
+                          />
+                        ) : (
+                          <video controls preload="metadata">
+                            <source src={video.preview.url} type={video.preview.mimeType} />
+                          </video>
+                        )}
+                      </div>
+                      <figcaption>
+                        <span>{providerLabel(video.provider)}</span>
+                        <a href={video.sourceUrl} target="_blank" rel="noreferrer">打开原链接</a>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
+            </div>
+          </article>
+        );
+      })}
+      {memos.length === 0 && <p class="empty-state">还没有公开短文。</p>}
+    </div>
+
+    {(hasPreviousPage || hasNextPage) && (
+      <nav class="pagination memo-pagination" aria-label="短文分页">
+        <div class="pagination-side">
+          {hasPreviousPage && <a href={previousPageHref} rel="prev">← 上一页</a>}
+        </div>
+        <span aria-current="page">第 {page} 页</span>
+        <div class="pagination-side pagination-next">
+          {hasNextPage && <a href={nextPageHref} rel="next">下一页 →</a>}
+        </div>
+      </nav>
+    )}
+  </section>
+</BaseLayout>

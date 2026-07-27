@@ -2,15 +2,90 @@ import { describe, expect, it } from "vitest";
 import {
   ABOUT_PAGE_SLUG,
   contentSlugSchema,
+  extractMemoTags,
   externalVideoInputSchema,
   groupInputSchema,
   isStandalonePageSlug,
+  memoCreateSchema,
+  memoInputSchema,
   normalizeVideoSource,
   postBulkActionSchema,
   postInputSchema,
   siteSettingsSchema,
   slugify
 } from "../src";
+
+describe("memo inputs", () => {
+  it("defaults new memos to published and trims their content", () => {
+    const result = memoCreateSchema.parse({ content: "  此刻有风。  " });
+
+    expect(result).toEqual({
+      content: "此刻有风。",
+      tags: [],
+      imageIds: [],
+      videoUrls: [],
+      status: "published"
+    });
+  });
+
+  it("derives unique structured tags from inline #tags", () => {
+    const result = memoCreateSchema.parse({
+      content: "今天在写 #Cloudflare，也记录 #生活。再次出现 #cloudflare 不应重复。",
+      tags: ["不会采用这个字段"]
+    });
+
+    expect(result.tags).toEqual(["Cloudflare", "生活"]);
+    expect(extractMemoTags("foo#anchor 与 ##标题 不算，#正常标签 可以")).toEqual([
+      "正常标签"
+    ]);
+  });
+
+  it("accepts structured tags and attachments with a concurrency version", () => {
+    expect(
+      memoInputSchema.safeParse({
+        content: "更新后的短文",
+        tags: ["生活", "此刻"],
+        imageIds: [],
+        videoUrls: ["https://vimeo.com/76979871"],
+        status: "draft",
+        isPinned: true,
+        version: 2
+      }).success
+    ).toBe(true);
+    expect(
+      memoCreateSchema.safeParse({
+        content: "",
+        imageIds: ["019f7e83-5ad4-7c51-88ba-7f97381ad81f"]
+      }).success
+    ).toBe(true);
+  });
+
+  it("rejects empty memos, duplicate tags, and unsupported videos", () => {
+    expect(
+      memoInputSchema.safeParse({
+        content: "   ",
+        tags: [],
+        imageIds: [],
+        videoUrls: [],
+        status: "published",
+        isPinned: false,
+        version: 0
+      }).success
+    ).toBe(false);
+    expect(
+      memoCreateSchema.safeParse({
+        content: "正文",
+        tags: ["生活", "生活"]
+      }).success
+    ).toBe(false);
+    expect(
+      memoCreateSchema.safeParse({
+        content: "正文",
+        videoUrls: ["https://example.com/watch/123"]
+      }).success
+    ).toBe(false);
+  });
+});
 
 describe("post slugs", () => {
   it("creates stable slugs for mixed Chinese and Latin titles", () => {
@@ -112,6 +187,8 @@ describe("site settings", () => {
     defaultTheme: "system" as const,
     showToc: true,
     showReadingTime: true,
+    enableMemos: true,
+    memoDescription: "一些轻量、即时的记录。",
     faviconMediaId: null,
     nav: [],
     social: [],

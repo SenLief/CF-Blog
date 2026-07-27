@@ -35,6 +35,8 @@ interface SiteRow {
   default_theme: "system" | "light" | "dark";
   show_toc: number;
   show_reading_time: number;
+  enable_memos: number;
+  memo_description: string;
   favicon_media_id: string | null;
   favicon_object_key: string | null;
   nav_json: string;
@@ -164,6 +166,8 @@ function mapSite(row: SiteRow, mediaBaseUrl: string): SiteSettings {
     defaultTheme: row.default_theme,
     showToc: row.show_toc === 1,
     showReadingTime: row.show_reading_time === 1,
+    enableMemos: row.enable_memos === 1,
+    memoDescription: row.memo_description,
     faviconMediaId: hasFavicon ? row.favicon_media_id : null,
     faviconUrl:
       hasFavicon && row.favicon_object_key

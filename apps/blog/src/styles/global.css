@@ -162,6 +162,38 @@ main { flex: 1; }
 .post-navigation span { color: var(--muted); font-size: 10px; }
 .post-navigation strong { margin-top: 6px; font-family: var(--serif); font-size: 15px; line-height: 1.55; transition: color 150ms ease; }
 .post-navigation a:hover strong { color: var(--accent-color); }
+.memo-page { width: min(100%, 760px); margin-inline: auto; }
+.memo-hero { padding-bottom: 40px; }
+.memo-hero > p:last-child { max-width: 560px; font-family: var(--serif); font-size: 16px; line-height: 1.75; }
+.memo-timeline { position: relative; }
+.memo-entry { display: grid; grid-template-columns: 38px minmax(0, 1fr); }
+.memo-rail { position: relative; }
+.memo-rail::after { content: ""; position: absolute; top: 0; bottom: 0; left: 12px; width: 1px; background: var(--line); }
+.memo-entry:first-of-type .memo-rail::after { top: 25px; }
+.memo-entry:last-of-type .memo-rail::after { bottom: calc(100% - 26px); }
+.memo-rail > span { position: relative; z-index: 1; display: block; width: 10px; height: 10px; margin: 21px 0 0 8px; border: 2px solid var(--bg); border-radius: 50%; background: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-color); }
+.memo-card { min-width: 0; margin-bottom: 17px; border: 1px solid var(--line); border-radius: 10px; padding: 18px 21px 20px; background: var(--paper); }
+.memo-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+.memo-public-author { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.memo-public-author > span { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: var(--paper); font-family: var(--serif); font-size: 13px; }
+.memo-public-author strong, .memo-public-author time { display: block; }
+.memo-public-author strong { font-family: var(--serif); font-size: 13px; }
+.memo-public-author time { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.memo-pinned { flex: none; border-radius: 999px; padding: 4px 8px; background: var(--soft); color: var(--accent-color); font-size: 9px; font-weight: 700; }
+.memo-content { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; font-family: var(--serif); font-size: 16px; line-height: 1.85; }
+.memo-inline-tag { color: var(--accent-color); }
+.memo-media { display: grid; gap: 11px; margin-top: 16px; }
+.memo-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; overflow: hidden; border-radius: 8px; }
+.memo-gallery-1 { grid-template-columns: minmax(0, 1fr); }
+.memo-gallery a { min-width: 0; background: var(--soft); }
+.memo-gallery img { display: block; width: 100%; height: 220px; object-fit: cover; }
+.memo-gallery-1 img { height: auto; max-height: 520px; object-fit: contain; }
+.memo-video { overflow: hidden; margin: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+.memo-video-frame { aspect-ratio: 16 / 9; background: #151515; }
+.memo-video-frame iframe, .memo-video-frame video { display: block; width: 100%; height: 100%; border: 0; }
+.memo-video figcaption { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; color: var(--muted); font-family: var(--sans); font-size: 9px; }
+.memo-video figcaption a { color: var(--accent-color); }
+.memo-pagination { margin: 36px 0 0 38px; }
 .about-page { max-width: 720px; margin-inline: auto; padding: 82px 0 20px; }
 .about-page > header { margin-bottom: 46px; }
 .about-page h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 7vw, 64px); line-height: 1.18; letter-spacing: -.05em; }
@@ -217,5 +249,13 @@ main { flex: 1; }
   .series-post-meta { white-space: normal; }
   .post-navigation { gap: 18px; margin-top: 52px; }
   .post-navigation strong { font-size: 14px; }
+  .memo-entry { grid-template-columns: 27px minmax(0, 1fr); }
+  .memo-rail::after { left: 8px; }
+  .memo-rail > span { margin-left: 4px; }
+  .memo-card { padding: 16px 16px 18px; }
+  .memo-content { font-size: 15.5px; }
+  .memo-gallery img { height: 150px; }
+  .memo-gallery-1 img { height: auto; }
+  .memo-pagination { margin-left: 27px; }
   .site-footer { flex-direction: column; }
 }

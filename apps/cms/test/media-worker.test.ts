@@ -69,6 +69,11 @@ class FakeStatement {
         ? { id: "referencing-post" }
         : null) as T | null;
     }
+    if (this.sql.includes("FROM memo_images")) {
+      return (this.database.referencedMemoMediaIds.has(String(this.values[0]))
+        ? { memo_id: "referencing-memo" }
+        : null) as T | null;
+    }
     throw new Error(`Unexpected first query: ${this.sql}`);
   }
 
@@ -117,6 +122,7 @@ class FakeDatabase {
   readonly images = new Map<string, ImageRow>();
   readonly videos = new Map<string, VideoRow>();
   readonly referencedObjectKeys = new Set<string>();
+  readonly referencedMemoMediaIds = new Set<string>();
   faviconMediaId: string | null = null;
 
   prepare(sql: string) {
@@ -258,6 +264,15 @@ describe("media worker API", () => {
     expect(r2Operations).toEqual([]);
 
     database.referencedObjectKeys.clear();
+    database.referencedMemoMediaIds.add("image-1");
+    const memoBlocked = await apiRequest(environment, "/api/media/image-1", {
+      method: "DELETE"
+    });
+    expect(memoBlocked.status).toBe(409);
+    expect(database.images.has("image-1")).toBe(true);
+    expect(r2Operations).toEqual([]);
+
+    database.referencedMemoMediaIds.clear();
     const deleted = await apiRequest(environment, "/api/media/image-1", {
       method: "DELETE"
     });
