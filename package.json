@@ -25,11 +25,11 @@
     "types": "pnpm --filter @cf-blog/cms types && pnpm --filter @cf-blog/blog types"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260719.1",
-    "@types/node": "^26.1.1",
-    "concurrently": "^10.0.3",
-    "typescript": "^6.0.2",
+    "@cloudflare/workers-types": "5.20260728.1",
+    "@types/node": "^26.1.2",
+    "concurrently": "^10.0.4",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10",
-    "wrangler": "^4.112.0"
+    "wrangler": "^4.114.0"
   }
 }
