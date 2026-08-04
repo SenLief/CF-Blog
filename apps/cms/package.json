@@ -20,18 +20,18 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hono/zod-validator": "^0.9.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "agents": "^0.17.4",
-    "hono": "^4.12.31",
-    "jose": "^6.2.3",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "agents": "^0.20.1",
+    "hono": "^4.12.33",
+    "jose": "^6.2.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.3",
     "vite": "^8.1.5"
   }
