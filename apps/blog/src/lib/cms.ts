@@ -28,8 +28,14 @@ async function json<T>(path: string): Promise<T> {
 
 export const cms = {
   site: () => json<SiteSettings>("/site"),
-  memos: (limit = 20, offset = 0) =>
-    json<Memo[]>(`/memos?limit=${limit}&offset=${offset}`),
+  memos: (limit = 20, offset = 0, tag?: string) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset)
+    });
+    if (tag) params.set("tag", tag);
+    return json<Memo[]>(`/memos?${params}`);
+  },
   posts: (limit = 20, offset = 0) =>
     json<PostSummary[]>(`/posts?limit=${limit}&offset=${offset}`),
   groups: () => json<GroupSummary[]>("/groups"),

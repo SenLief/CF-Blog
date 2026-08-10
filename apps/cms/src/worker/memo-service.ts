@@ -20,6 +20,10 @@ interface MemoRow {
   status: MemoStatus;
   is_pinned: number;
   video_json: string;
+  location_name: string;
+  location_latitude: number | null;
+  location_longitude: number | null;
+  location_precision: "exact" | "approximate";
   version: number;
   published_at: string | null;
   created_at: string;
@@ -45,6 +49,7 @@ interface MemoImageRow {
 
 const MEMO_SELECT = `
   SELECT id, content_markdown, status, is_pinned, video_json,
+    location_name, location_latitude, location_longitude, location_precision,
     version, published_at, created_at, updated_at
   FROM memos
 `;
@@ -93,12 +98,24 @@ function mapMemo(
   tags: string[] = [],
   images: MemoImage[] = []
 ): Memo {
+  const location: Memo["location"] =
+    row.location_name.trim() &&
+    typeof row.location_latitude === "number" &&
+    typeof row.location_longitude === "number"
+      ? {
+          name: row.location_name,
+          latitude: row.location_latitude,
+          longitude: row.location_longitude,
+          precision: row.location_precision
+        }
+      : null;
   return {
     id: row.id,
     content: row.content_markdown,
     tags,
     images,
     videos: parseVideos(row.video_json),
+    location,
     status: row.status,
     isPinned: row.is_pinned === 1,
     publishedAt: row.published_at,
@@ -182,6 +199,7 @@ export async function listMemos(
   options: {
     status?: MemoStatus;
     query?: string;
+    tag?: string;
     limit?: number;
     offset?: number;
   } = {}
@@ -201,6 +219,16 @@ export async function listMemos(
       ))`
     );
     values.push(`%${options.query}%`, `%${options.query}%`);
+  }
+  if (options.tag) {
+    filters.push(
+      `EXISTS (
+        SELECT 1 FROM memo_tags mt
+        JOIN tags t ON t.id = mt.tag_id
+        WHERE mt.memo_id = memos.id AND t.name = ? COLLATE NOCASE
+      )`
+    );
+    values.push(options.tag);
   }
   const where = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
   values.push(Math.min(options.limit ?? 100, 200), options.offset ?? 0);
@@ -307,14 +335,17 @@ export async function createMemo(
   const tagIds = await resolveTagIds(db, extractMemoTags(input.content));
   await assertImagesExist(db, input.imageIds);
   const videoUrls = normalizeVideoUrls(input.videoUrls);
+  const location = input.location;
 
   await db.batch([
     db
       .prepare(
         `INSERT INTO memos (
           id, content_markdown, content_html, content_text, status,
-          is_pinned, video_json, version, published_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 0, ?, 0, ?, ?, ?)`
+          is_pinned, video_json, location_name, location_latitude,
+          location_longitude, location_precision, version, published_at,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
       )
       .bind(
         id,
@@ -323,6 +354,10 @@ export async function createMemo(
         input.content,
         input.status,
         JSON.stringify(videoUrls),
+        location?.name ?? "",
+        location?.latitude ?? null,
+        location?.longitude ?? null,
+        location?.precision ?? "approximate",
         publishedAt,
         timestamp,
         timestamp
@@ -360,6 +395,7 @@ export async function updateMemo(
   const tagIds = await resolveTagIds(db, extractMemoTags(input.content));
   await assertImagesExist(db, input.imageIds);
   const videoUrls = normalizeVideoUrls(input.videoUrls);
+  const location = input.location;
   const timestamp = nowIso();
   const publishedAt =
     input.status === "published" ? existing.publishedAt ?? timestamp : null;
@@ -370,6 +406,8 @@ export async function updateMemo(
         `UPDATE memos SET
           content_markdown = ?, content_html = ?, content_text = ?,
           status = ?, is_pinned = ?, video_json = ?, published_at = ?,
+          location_name = ?, location_latitude = ?, location_longitude = ?,
+          location_precision = ?,
           version = version + 1, updated_at = ?
          WHERE id = ? AND version = ?`
       )
@@ -381,6 +419,10 @@ export async function updateMemo(
         input.isPinned ? 1 : 0,
         JSON.stringify(videoUrls),
         publishedAt,
+        location?.name ?? "",
+        location?.latitude ?? null,
+        location?.longitude ?? null,
+        location?.precision ?? "approximate",
         timestamp,
         id,
         input.version

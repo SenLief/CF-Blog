@@ -8,7 +8,9 @@ import {
   isStandalonePageSlug,
   memoCreateSchema,
   memoInputSchema,
+  memoTextWithoutTags,
   normalizeVideoSource,
+  openStreetMapLocationUrl,
   postBulkActionSchema,
   postInputSchema,
   siteSettingsSchema,
@@ -24,6 +26,7 @@ describe("memo inputs", () => {
       tags: [],
       imageIds: [],
       videoUrls: [],
+      location: null,
       status: "published"
     });
   });
@@ -40,6 +43,16 @@ describe("memo inputs", () => {
     ]);
   });
 
+  it("removes inline tags from displayed memo text without awkward spacing", () => {
+    expect(memoTextWithoutTags("#Cloudflare 今天学习 #Workers 很开心 #生活")).toBe(
+      "今天学习 很开心"
+    );
+    expect(memoTextWithoutTags("刚读完 #阅读，值得推荐。"))
+      .toBe("刚读完，值得推荐。");
+    expect(memoTextWithoutTags("第一行\n#随记\n第二行")).toBe("第一行\n第二行");
+    expect(memoTextWithoutTags("#标签")).toBe("");
+  });
+
   it("accepts structured tags and attachments with a concurrency version", () => {
     expect(
       memoInputSchema.safeParse({
@@ -47,6 +60,7 @@ describe("memo inputs", () => {
         tags: ["生活", "此刻"],
         imageIds: [],
         videoUrls: ["https://vimeo.com/76979871"],
+        location: null,
         status: "draft",
         isPinned: true,
         version: 2
@@ -67,6 +81,7 @@ describe("memo inputs", () => {
         tags: [],
         imageIds: [],
         videoUrls: [],
+        location: null,
         status: "published",
         isPinned: false,
         version: 0
@@ -82,6 +97,39 @@ describe("memo inputs", () => {
       memoCreateSchema.safeParse({
         content: "正文",
         videoUrls: ["https://example.com/watch/123"]
+      }).success
+    ).toBe(false);
+  });
+
+  it("validates locations and reduces approximate coordinates to a neighborhood", () => {
+    const result = memoCreateSchema.parse({
+      content: "带位置的短文",
+      location: {
+        name: " 上海 · 静安寺附近 ",
+        latitude: 31.223456,
+        longitude: 121.445678,
+        precision: "approximate"
+      }
+    });
+
+    expect(result.location).toEqual({
+      name: "上海 · 静安寺附近",
+      latitude: 31.223,
+      longitude: 121.446,
+      precision: "approximate"
+    });
+    expect(openStreetMapLocationUrl(result.location!)).toBe(
+      "https://www.openstreetmap.org/?mlat=31.223&mlon=121.446#map=13/31.223/121.446"
+    );
+    expect(
+      memoCreateSchema.safeParse({
+        content: "无效位置",
+        location: {
+          name: "越界",
+          latitude: 91,
+          longitude: 0,
+          precision: "exact"
+        }
       }).success
     ).toBe(false);
   });

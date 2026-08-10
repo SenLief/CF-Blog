@@ -43,6 +43,7 @@ import {
 } from "./http";
 import { handleMcpRequest } from "./mcp";
 import { serveMedia } from "./media";
+import { searchMemoLocations } from "./location-service";
 import {
   createMemo,
   deleteMemo,
@@ -295,7 +296,8 @@ app.get("/api/memos", async (c) => {
   return c.json(
     await listMemos(c.env.DB, c.env.MEDIA_BASE_URL, {
       status: statusResult?.success ? statusResult.data : undefined,
-      query: c.req.query("q")?.trim() || undefined
+      query: c.req.query("q")?.trim() || undefined,
+      tag: c.req.query("tag")?.trim() || undefined
     })
   );
 });
@@ -338,6 +340,20 @@ app.delete(
     await requireMemosEnabled(c.env.DB);
     await deleteMemo(c.env.DB, c.req.param("id"));
     return c.body(null, 204);
+  }
+);
+
+app.get(
+  "/api/locations/search",
+  zValidator(
+    "query",
+    z.object({ q: z.string().trim().min(2).max(120) })
+  ),
+  async (c) => {
+    const query = c.req.valid("query").q;
+    const results = await searchMemoLocations(query, c.env.BLOG_URL);
+    c.header("Cache-Control", "private, max-age=300");
+    return c.json(results);
   }
 );
 

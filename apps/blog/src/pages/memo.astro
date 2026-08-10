@@ -1,21 +1,39 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import { cms } from "@/lib/cms";
-import { memoContentParts } from "@cf-blog/contracts";
+import {
+  memoTextWithoutTags,
+  openStreetMapLocationUrl
+} from "@cf-blog/contracts";
 
 const PAGE_SIZE = 20;
+const MEMO_TAG_PATTERN = /^[\p{L}\p{N}_-]{1,40}$/u;
 const pageParam = Astro.url.searchParams.get("page");
+const tagParam = Astro.url.searchParams.get("tag");
+const tag = tagParam ?? "";
 const page = pageParam === null ? 1 : Number(pageParam);
 const offset = (page - 1) * PAGE_SIZE;
 
+function memoHref(targetPage = 1): string {
+  const params = new URLSearchParams();
+  if (tag) params.set("tag", tag);
+  if (targetPage > 1) params.set("page", String(targetPage));
+  const query = params.toString();
+  return query ? `/memo?${query}` : "/memo";
+}
+
 if (
+  (tagParam !== null && !MEMO_TAG_PATTERN.test(tagParam)) ||
   (pageParam !== null && !/^[1-9]\d*$/.test(pageParam)) ||
   !Number.isSafeInteger(page) ||
   !Number.isSafeInteger(offset) ||
   page < 1 ||
   pageParam === "1"
 ) {
-  return Astro.redirect("/memo", 302);
+  return Astro.redirect(
+    tagParam !== null && MEMO_TAG_PATTERN.test(tagParam) ? memoHref() : "/memo",
+    302
+  );
 }
 
 const site = await cms.site();
@@ -24,17 +42,18 @@ if (!site.enableMemos) {
   return new Response("Not found", { status: 404 });
 }
 
-const pageMemos = await cms.memos(PAGE_SIZE + 1, offset);
+const pageMemos = await cms.memos(PAGE_SIZE + 1, offset, tag || undefined);
 
 if (page > 1 && pageMemos.length === 0) {
-  return Astro.redirect("/memo", 302);
+  return Astro.redirect(memoHref(), 302);
 }
 
 const memos = pageMemos.slice(0, PAGE_SIZE);
+const hasMemoImages = memos.some((memo) => memo.images.length > 0);
 const hasPreviousPage = page > 1;
 const hasNextPage = pageMemos.length > PAGE_SIZE;
-const previousPageHref = page === 2 ? "/memo" : `/memo?page=${page - 1}`;
-const nextPageHref = `/memo?page=${page + 1}`;
+const previousPageHref = memoHref(page - 1);
+const nextPageHref = memoHref(page + 1);
 const author = site.authorName.trim() || site.title;
 const authorMark = Array.from(author.trim())[0] ?? "M";
 
@@ -68,19 +87,28 @@ function providerLabel(provider: string): string {
 
 <BaseLayout
   site={site}
-  title={`短文${page > 1 ? ` · 第 ${page} 页` : ""}`}
-  description={site.memoDescription || `${site.title} 的短文与即时想法`}
+  title={`短文${tag ? ` · #${tag}` : ""}${page > 1 ? ` · 第 ${page} 页` : ""}`}
+  description={tag
+    ? `${site.title} 中带有 #${tag} 标签的短文`
+    : site.memoDescription || `${site.title} 的短文与即时想法`}
 >
   <section class="memo-page">
     <header class="section-hero memo-hero">
       <p class="kicker">Memos</p>
       <h1>短文</h1>
       {site.memoDescription && <p>{site.memoDescription}</p>}
+      {tag && (
+        <div class="memo-filter" aria-label={`当前按标签 ${tag} 筛选`}>
+          <span>标签 <strong>#{tag}</strong></span>
+          <a href="/memo">查看全部短文</a>
+        </div>
+      )}
     </header>
 
     <div class="memo-timeline" aria-label="短文时间轴">
       {memos.map((memo) => {
         const timestamp = memo.publishedAt ?? memo.createdAt;
+        const visibleContent = memoTextWithoutTags(memo.content);
         return (
           <article class="memo-entry">
             <div class="memo-rail" aria-hidden="true"><span /></div>
@@ -95,21 +123,21 @@ function providerLabel(provider: string): string {
                 </div>
                 {memo.isPinned && <span class="memo-pinned">置顶</span>}
               </header>
-              {memo.content && (
-                <p class="memo-content">
-                  {memoContentParts(memo.content).map((part) =>
-                    part.type === "tag" ? (
-                      <span class="memo-inline-tag">{part.value}</span>
-                    ) : part.value
-                  )}
-                </p>
-              )}
+              {visibleContent && <p class="memo-content">{visibleContent}</p>}
               {(memo.images.length > 0 || memo.videos.length > 0) && (
                 <div class="memo-media">
                   {memo.images.length > 0 && (
-                    <div class={`memo-gallery memo-gallery-${Math.min(memo.images.length, 4)}`}>
+                    <div
+                      class={`memo-gallery memo-gallery-${memo.images.length}`}
+                      data-memo-gallery
+                    >
                       {memo.images.map((image) => (
-                        <a href={image.url} target="_blank" rel="noreferrer">
+                        <a
+                          data-memo-image
+                          href={image.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
                           <img
                             alt={image.alt || "短文图片"}
                             height={image.height ?? undefined}
@@ -147,11 +175,44 @@ function providerLabel(provider: string): string {
                   ))}
                 </div>
               )}
+              {(memo.location || memo.tags.length > 0) && (
+                <div class="memo-taxonomy">
+                  {memo.location && (
+                    <a
+                      class="memo-location"
+                      href={openStreetMapLocationUrl(memo.location)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span aria-hidden="true">⌖</span>
+                      {memo.location.name}
+                    </a>
+                  )}
+                  {memo.tags.length > 0 && (
+                    <div class="memo-tags" aria-label="短文标签">
+                      {memo.tags.map((memoTag) => (
+                        <a
+                          aria-current={tag.toLocaleLowerCase() === memoTag.toLocaleLowerCase()
+                            ? "page"
+                            : undefined}
+                          href={`/memo?tag=${encodeURIComponent(memoTag)}`}
+                        >
+                          #{memoTag}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </article>
         );
       })}
-      {memos.length === 0 && <p class="empty-state">还没有公开短文。</p>}
+      {memos.length === 0 && (
+        <p class="empty-state">
+          {tag ? <>还没有使用 <strong>#{tag}</strong> 的公开短文。</> : "还没有公开短文。"}
+        </p>
+      )}
     </div>
 
     {(hasPreviousPage || hasNextPage) && (
@@ -166,4 +227,38 @@ function providerLabel(provider: string): string {
       </nav>
     )}
   </section>
+
+  {hasMemoImages && (
+    <dialog class="memo-lightbox" aria-label="图片预览" data-memo-lightbox>
+      <div class="memo-lightbox-shell">
+        <button
+          class="memo-lightbox-close"
+          type="button"
+          aria-label="关闭图片预览"
+          data-memo-lightbox-close
+        >×</button>
+        <button
+          class="memo-lightbox-nav memo-lightbox-previous"
+          type="button"
+          aria-label="上一张图片"
+          data-memo-lightbox-previous
+        >‹</button>
+        <figure data-memo-lightbox-stage>
+          <img alt="" draggable="false" data-memo-lightbox-image />
+          <figcaption>
+            <span data-memo-lightbox-caption></span>
+            <span aria-live="polite" data-memo-lightbox-counter></span>
+          </figcaption>
+        </figure>
+        <button
+          class="memo-lightbox-nav memo-lightbox-next"
+          type="button"
+          aria-label="下一张图片"
+          data-memo-lightbox-next
+        >›</button>
+      </div>
+    </dialog>
+  )}
 </BaseLayout>
+
+{hasMemoImages && <script is:inline src="/scripts/memo.js"></script>}

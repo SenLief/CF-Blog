@@ -9,6 +9,7 @@ import type {
   Memo,
   MemoCreateInput,
   MemoInput,
+  MemoLocationSearchResult,
   PostBulkAction,
   PostBulkActionResult,
   PostDetail,
@@ -74,10 +75,11 @@ export const api = {
       body: JSON.stringify({ enableMemos })
     }),
 
-  listMemos: (status?: string, query?: string) => {
+  listMemos: (options: { status?: string; query?: string; tag?: string } = {}) => {
     const params = new URLSearchParams();
-    if (status) params.set("status", status);
-    if (query) params.set("q", query);
+    if (options.status) params.set("status", options.status);
+    if (options.query) params.set("q", options.query);
+    if (options.tag) params.set("tag", options.tag);
     return request<Memo[]>(`/api/memos?${params}`);
   },
   createMemo: (input: MemoCreateInput) =>
@@ -94,6 +96,10 @@ export const api = {
     request<void>(`/api/memos/${id}`, {
       method: "DELETE"
     }),
+  searchMemoLocations: (query: string) => {
+    const params = new URLSearchParams({ q: query });
+    return request<MemoLocationSearchResult[]>(`/api/locations/search?${params}`);
+  },
 
   listGroups: () => request<GroupSummary[]>("/api/groups"),
   createGroup: (input: GroupInput) =>

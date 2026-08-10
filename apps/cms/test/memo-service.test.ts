@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createMemo,
   deleteMemo,
+  listMemos,
   updateMemo
 } from "../src/worker/memo-service";
 
@@ -17,6 +18,10 @@ function memoRow(overrides: Record<string, unknown> = {}) {
     status: "published",
     is_pinned: 0,
     video_json: "[]",
+    location_name: "",
+    location_latitude: null,
+    location_longitude: null,
+    location_precision: "approximate",
     version: 0,
     published_at: NOW,
     created_at: NOW,
@@ -41,10 +46,39 @@ function statement(options: {
 }
 
 describe("memo service", () => {
+  it("filters memos by an exact case-insensitive tag while preserving pagination", async () => {
+    const select = statement({ results: [] });
+    const db = {
+      prepare: vi.fn().mockReturnValue(select)
+    } as unknown as D1Database;
+
+    await listMemos(db, MEDIA_BASE_URL, {
+      status: "published",
+      tag: "Cloudflare",
+      limit: 21,
+      offset: 20
+    });
+
+    const query = db.prepare.mock.calls[0]?.[0] as string;
+    expect(query).toContain("t.name = ? COLLATE NOCASE");
+    expect(query).not.toContain("t.name LIKE ?");
+    expect(select.bind).toHaveBeenCalledWith(
+      "published",
+      "Cloudflare",
+      21,
+      20
+    );
+  });
+
   it("stores memo content as escaped plain text instead of Markdown HTML", async () => {
     const insert = statement();
     const select = statement({
-      first: memoRow({ content_markdown: "<b>纯文本</b>" })
+      first: memoRow({
+        content_markdown: "<b>纯文本</b>",
+        location_name: "上海 · 静安寺附近",
+        location_latitude: 31.223,
+        location_longitude: 121.446
+      })
     });
     const relations = statement({ results: [] });
     const db = {
@@ -63,6 +97,12 @@ describe("memo service", () => {
       tags: [],
       imageIds: [],
       videoUrls: [],
+      location: {
+        name: "上海 · 静安寺附近",
+        latitude: 31.223,
+        longitude: 121.446,
+        precision: "approximate"
+      },
       status: "published"
     });
 
@@ -73,6 +113,10 @@ describe("memo service", () => {
       "<b>纯文本</b>",
       "published",
       "[]",
+      "上海 · 静安寺附近",
+      31.223,
+      121.446,
+      "approximate",
       expect.any(String),
       expect.any(String),
       expect.any(String)
@@ -82,6 +126,12 @@ describe("memo service", () => {
       tags: [],
       images: [],
       videos: [],
+      location: {
+        name: "上海 · 静安寺附近",
+        latitude: 31.223,
+        longitude: 121.446,
+        precision: "approximate"
+      },
       status: "published",
       version: 0
     });
@@ -105,6 +155,7 @@ describe("memo service", () => {
         tags: [],
         imageIds: [],
         videoUrls: [],
+        location: null,
         status: "published",
         isPinned: false,
         version: 2

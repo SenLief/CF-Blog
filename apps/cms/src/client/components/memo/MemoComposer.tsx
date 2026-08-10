@@ -2,9 +2,17 @@ import type {
   ImageMediaItem,
   Memo,
   MemoImage,
+  MemoLocation,
+  MemoLocationPrecision,
+  MemoLocationSearchResult,
   MemoStatus
 } from "@cf-blog/contracts";
-import { extractMemoTags, normalizeVideoSource } from "@cf-blog/contracts";
+import {
+  extractMemoTags,
+  memoLocationSchema,
+  normalizeVideoSource,
+  openStreetMapLocationUrl
+} from "@cf-blog/contracts";
 import {
   useEffect,
   useLayoutEffect,
@@ -24,6 +32,7 @@ export interface MemoComposerValue {
   tags: string[];
   imageIds: string[];
   videoUrls: string[];
+  location: MemoLocation | null;
   status: MemoStatus;
 }
 
@@ -37,7 +46,15 @@ interface DraftState {
   content: string;
   images: MemoImage[];
   videoUrls: string[];
+  location: MemoLocation | null;
   status: MemoStatus;
+}
+
+interface LocationFormState {
+  name: string;
+  latitude: string;
+  longitude: string;
+  precision: MemoLocationPrecision;
 }
 
 const DRAFT_KEY = "cf-blog:memo-draft:v1";
@@ -47,6 +64,7 @@ function blankDraft(): DraftState {
     content: "",
     images: [],
     videoUrls: [],
+    location: null,
     status: "published"
   };
 }
@@ -56,7 +74,17 @@ function memoDraft(memo: Memo): DraftState {
     content: memo.content,
     images: memo.images,
     videoUrls: memo.videos.map((video) => video.sourceUrl),
+    location: memo.location,
     status: memo.status
+  };
+}
+
+function locationForm(location: MemoLocation | null): LocationFormState {
+  return {
+    name: location?.name ?? "",
+    latitude: location ? String(location.latitude) : "",
+    longitude: location ? String(location.longitude) : "",
+    precision: location?.precision ?? "approximate"
   };
 }
 
@@ -111,6 +139,10 @@ function cachedDraft(): DraftState {
       videoUrls: Array.isArray(value.videoUrls)
         ? value.videoUrls.filter((url): url is string => typeof url === "string")
         : [],
+      location: (() => {
+        const parsed = memoLocationSchema.safeParse(value.location);
+        return parsed.success ? parsed.data : null;
+      })(),
       status: value.status === "draft" ? "draft" : "published"
     };
   } catch {
@@ -177,6 +209,15 @@ function LinkIcon() {
   );
 }
 
+function LocationIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
 function PaperclipIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -214,17 +255,36 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
     memo ? memoDraft(memo) : cachedDraft()
   );
   const [videoInput, setVideoInput] = useState("");
-  const [activePanel, setActivePanel] = useState<"video" | null>(null);
+  const [activePanel, setActivePanel] = useState<"video" | "location" | null>(null);
+  const [locationInput, setLocationInput] = useState<LocationFormState>(() =>
+    locationForm(draft.location)
+  );
+  const [locating, setLocating] = useState(false);
+  const [searchingLocation, setSearchingLocation] = useState(false);
+  const [locationSearchDone, setLocationSearchDone] = useState(false);
+  const [locationSearchResults, setLocationSearchResults] = useState<
+    MemoLocationSearchResult[]
+  >([]);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [insertMenuOpen, setInsertMenuOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const locationSearchPendingRef = useRef(false);
+  const lastLocationSearchAtRef = useRef(0);
 
   useEffect(() => {
-    setDraft(memo ? memoDraft(memo) : cachedDraft());
+    const nextDraft = memo ? memoDraft(memo) : cachedDraft();
+    setDraft(nextDraft);
+    setLocationInput(locationForm(nextDraft.location));
     setVideoInput("");
+    setLocating(false);
+    setSearchingLocation(false);
+    setLocationSearchDone(false);
+    setLocationSearchResults([]);
+    setSelectedLocationId(null);
     setActivePanel(null);
     setInsertMenuOpen(false);
     setPreviewUrl(null);
@@ -237,7 +297,8 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
       const empty =
         !draft.content.trim() &&
         draft.images.length === 0 &&
-        draft.videoUrls.length === 0;
+        draft.videoUrls.length === 0 &&
+        !draft.location;
       if (empty) localStorage.removeItem(DRAFT_KEY);
       else localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     }, 250);
@@ -275,6 +336,117 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
     setError("");
   };
 
+  const openLocationEditor = () => {
+    setLocationInput(locationForm(draft.location));
+    setLocationSearchDone(false);
+    setLocationSearchResults([]);
+    setSelectedLocationId(null);
+    setActivePanel("location");
+    setInsertMenuOpen(false);
+    setError("");
+  };
+
+  const searchLocation = async () => {
+    if (locationSearchPendingRef.current) return;
+    const query = locationInput.name.trim();
+    if (query.length < 2) {
+      setError("请至少输入两个字后再搜索位置");
+      return;
+    }
+    locationSearchPendingRef.current = true;
+    setSearchingLocation(true);
+    setLocationSearchDone(false);
+    setLocationSearchResults([]);
+    setSelectedLocationId(null);
+    setError("");
+    try {
+      const delay = Math.max(
+        0,
+        1_000 - (Date.now() - lastLocationSearchAtRef.current)
+      );
+      if (delay > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, delay));
+      }
+      lastLocationSearchAtRef.current = Date.now();
+      const results = await api.searchMemoLocations(query);
+      setLocationSearchResults(results);
+      setLocationSearchDone(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "位置搜索失败");
+    } finally {
+      locationSearchPendingRef.current = false;
+      setSearchingLocation(false);
+    }
+  };
+
+  const selectLocationResult = (result: MemoLocationSearchResult) => {
+    setLocationInput((current) => ({
+      ...current,
+      latitude: String(result.latitude),
+      longitude: String(result.longitude)
+    }));
+    setSelectedLocationId(result.id);
+    setError("");
+  };
+
+  const applyLocation = () => {
+    if (
+      !locationInput.name.trim() ||
+      !locationInput.latitude.trim() ||
+      !locationInput.longitude.trim()
+    ) {
+      setError("请填写位置名称、纬度和经度");
+      return;
+    }
+    const parsed = memoLocationSchema.safeParse({
+      name: locationInput.name,
+      latitude: Number(locationInput.latitude),
+      longitude: Number(locationInput.longitude),
+      precision: locationInput.precision
+    });
+    if (!parsed.success) {
+      setError("位置坐标无效：纬度应在 -90 到 90，经度应在 -180 到 180");
+      return;
+    }
+    patchDraft({ location: parsed.data });
+    setLocationInput(locationForm(parsed.data));
+    setActivePanel(null);
+    setError("");
+  };
+
+  const useCurrentLocation = () => {
+    if (!("geolocation" in navigator)) {
+      setError("当前浏览器不支持读取地理位置");
+      return;
+    }
+    setLocating(true);
+    setError("");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setLocationInput((current) => ({
+          ...current,
+          name: current.name || "当前位置",
+          latitude: coords.latitude.toFixed(6),
+          longitude: coords.longitude.toFixed(6)
+        }));
+        setLocationSearchDone(false);
+        setLocationSearchResults([]);
+        setSelectedLocationId(null);
+        setLocating(false);
+      },
+      (reason) => {
+        const messages: Record<number, string> = {
+          1: "未获得定位权限，你仍可以手动填写坐标",
+          2: "暂时无法获取当前位置，请稍后重试或手动填写",
+          3: "获取当前位置超时，请重试或手动填写"
+        };
+        setError(messages[reason.code] ?? "无法获取当前位置");
+        setLocating(false);
+      },
+      { enableHighAccuracy: false, maximumAge: 300_000, timeout: 10_000 }
+    );
+  };
+
   const uploadImages = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.currentTarget.files ?? []);
     event.currentTarget.value = "";
@@ -308,6 +480,20 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
   );
   const inlineTags = extractMemoTags(draft.content);
   const attachmentCount = draft.images.length + draft.videoUrls.length;
+  const locationPreview = (() => {
+    if (
+      !locationInput.name.trim() ||
+      !locationInput.latitude.trim() ||
+      !locationInput.longitude.trim()
+    ) return null;
+    const parsed = memoLocationSchema.safeParse({
+      name: locationInput.name,
+      latitude: Number(locationInput.latitude),
+      longitude: Number(locationInput.longitude),
+      precision: locationInput.precision
+    });
+    return parsed.success ? parsed.data : null;
+  })();
 
   const save = async () => {
     if (!canSave || saving || uploading) return;
@@ -319,6 +505,7 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
         tags: inlineTags,
         imageIds: draft.images.map((image) => image.id),
         videoUrls: draft.videoUrls,
+        location: draft.location,
         status: draft.status
       });
       if (!memo) {
@@ -490,6 +677,170 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
         </div>
       )}
 
+      {draft.location && activePanel !== "location" && (
+        <div className="memo-editor-location-summary">
+          <button onClick={openLocationEditor} type="button">
+            <LocationIcon />
+            <span>{draft.location.name}</span>
+          </button>
+          <button
+            aria-label="移除位置"
+            onClick={() => patchDraft({ location: null })}
+            title="移除位置"
+            type="button"
+          ><CloseIcon /></button>
+        </div>
+      )}
+
+      {activePanel === "location" && (
+        <div className="memo-editor-panel memo-location-panel">
+          <div className="memo-location-panel-heading">
+            <LocationIcon />
+            <strong>位置标签</strong>
+            <span>访客点击后将在 OpenStreetMap 查看</span>
+          </div>
+          <div className="memo-location-name-field">
+            <label>
+              <span>位置名称</span>
+              <input
+                autoFocus
+                maxLength={120}
+                onChange={(event) => {
+                  setLocationInput((current) => ({
+                    ...current,
+                    name: event.target.value
+                  }));
+                  setLocationSearchDone(false);
+                  setLocationSearchResults([]);
+                  setSelectedLocationId(null);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void searchLocation();
+                  }
+                }}
+                placeholder="例如：上海静安寺"
+                type="search"
+                value={locationInput.name}
+              />
+            </label>
+            <button
+              disabled={searchingLocation || locationInput.name.trim().length < 2}
+              onClick={() => void searchLocation()}
+              type="button"
+            >{searchingLocation ? "搜索中…" : "搜索位置"}</button>
+          </div>
+          {locationSearchDone && (
+            <div className="memo-location-search-results">
+              {locationSearchResults.length > 0 ? (
+                <div aria-label="位置搜索结果" role="listbox">
+                  {locationSearchResults.map((result) => (
+                    <button
+                      aria-selected={selectedLocationId === result.id}
+                      key={result.id}
+                      onClick={() => selectLocationResult(result)}
+                      role="option"
+                      type="button"
+                    >
+                      <span aria-hidden="true">⌖</span>
+                      <span>{result.displayName}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p>没有找到匹配位置，可以换个名称或直接填写坐标。</p>
+              )}
+              <small>
+                搜索结果来自 <a href="https://nominatim.openstreetmap.org/" rel="noreferrer" target="_blank">Nominatim</a>
+                ，地图数据 © <a href="https://www.openstreetmap.org/copyright" rel="noreferrer" target="_blank">OpenStreetMap contributors</a>
+              </small>
+            </div>
+          )}
+          <div className="memo-location-coordinates">
+            <label>
+              <span>纬度</span>
+              <input
+                inputMode="decimal"
+                max="90"
+                min="-90"
+                onChange={(event) => {
+                  setLocationInput((current) => ({
+                    ...current,
+                    latitude: event.target.value
+                  }));
+                  setSelectedLocationId(null);
+                }}
+                placeholder="31.2304"
+                step="any"
+                type="number"
+                value={locationInput.latitude}
+              />
+            </label>
+            <label>
+              <span>经度</span>
+              <input
+                inputMode="decimal"
+                max="180"
+                min="-180"
+                onChange={(event) => {
+                  setLocationInput((current) => ({
+                    ...current,
+                    longitude: event.target.value
+                  }));
+                  setSelectedLocationId(null);
+                }}
+                placeholder="121.4737"
+                step="any"
+                type="number"
+                value={locationInput.longitude}
+              />
+            </label>
+            <label>
+              <span>精度</span>
+              <select
+                onChange={(event) =>
+                  setLocationInput((current) => ({
+                    ...current,
+                    precision: event.target.value as MemoLocationPrecision
+                  }))
+                }
+                value={locationInput.precision}
+              >
+                <option value="approximate">大致位置（推荐）</option>
+                <option value="exact">精确位置</option>
+              </select>
+            </label>
+          </div>
+          <p>大致位置会将经纬度保留到小数点后三位，约为街区范围。</p>
+          <div className="memo-location-panel-actions">
+            <button disabled={locating} onClick={useCurrentLocation} type="button">
+              {locating ? "定位中…" : "使用当前位置"}
+            </button>
+            {locationPreview && (
+              <a
+                href={openStreetMapLocationUrl(locationPreview)}
+                rel="noreferrer"
+                target="_blank"
+              >在 OSM 预览</a>
+            )}
+            {draft.location && (
+              <button
+                className="danger-text"
+                onClick={() => {
+                  patchDraft({ location: null });
+                  setActivePanel(null);
+                }}
+                type="button"
+              >移除</button>
+            )}
+            <button className="primary" onClick={applyLocation} type="button">
+              应用位置
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && <p className="memo-editor-error" role="alert">{error}</p>}
 
       <footer className="memo-editor-toolbar">
@@ -526,6 +877,9 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
                   }}
                   type="button"
                 ><LinkIcon />视频链接</button>
+                <button onClick={openLocationEditor} type="button">
+                  <LocationIcon />位置
+                </button>
               </div>
             )}
           </div>
@@ -542,10 +896,11 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
               <option value="draft">草稿</option>
             </select>
           </label>
-          {(inlineTags.length > 0 || attachmentCount > 0) && (
+          {(inlineTags.length > 0 || attachmentCount > 0 || draft.location) && (
             <small>
               {inlineTags.length > 0 && `${inlineTags.length} 标签`}
               {attachmentCount > 0 && `${inlineTags.length > 0 ? " · " : ""}${attachmentCount} 附件`}
+              {draft.location && `${inlineTags.length > 0 || attachmentCount > 0 ? " · " : ""}位置`}
             </small>
           )}
         </div>

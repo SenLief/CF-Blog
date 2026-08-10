@@ -6,6 +6,41 @@ export type PostStatus = z.infer<typeof postStatusSchema>;
 export const memoStatusSchema = z.enum(["draft", "published"]);
 export type MemoStatus = z.infer<typeof memoStatusSchema>;
 
+export const memoLocationPrecisionSchema = z.enum(["exact", "approximate"]);
+export type MemoLocationPrecision = z.infer<
+  typeof memoLocationPrecisionSchema
+>;
+
+export const memoLocationSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    latitude: z.number().finite().min(-90).max(90),
+    longitude: z.number().finite().min(-180).max(180),
+    precision: memoLocationPrecisionSchema
+  })
+  .transform((location) =>
+    location.precision === "approximate"
+      ? {
+          ...location,
+          latitude: Number(location.latitude.toFixed(3)),
+          longitude: Number(location.longitude.toFixed(3))
+        }
+      : location
+  );
+export type MemoLocation = z.infer<typeof memoLocationSchema>;
+
+export interface MemoLocationSearchResult {
+  id: string;
+  displayName: string;
+  latitude: number;
+  longitude: number;
+}
+
+export function openStreetMapLocationUrl(location: MemoLocation): string {
+  const zoom = location.precision === "exact" ? 16 : 13;
+  return `https://www.openstreetmap.org/?mlat=${location.latitude}&mlon=${location.longitude}#map=${zoom}/${location.latitude}/${location.longitude}`;
+}
+
 const memoContentSchema = z.string().trim().max(20_000);
 const memoTagsSchema = z
   .array(z.string().trim().min(1).max(40))
@@ -95,6 +130,45 @@ export function extractMemoTags(content: string): string[] {
   return tags;
 }
 
+export function memoTextWithoutTags(content: string): string {
+  let result = "";
+  let removedTag = false;
+
+  for (const part of memoContentParts(content)) {
+    if (part.type === "tag") {
+      removedTag = true;
+      continue;
+    }
+
+    let value = part.value;
+    if (removedTag) {
+      const hasTrailingSpace = /[ \t]$/.test(result);
+      const startsWithSpace = /^[ \t]/.test(value);
+      const startsWithLineBreak = /^\r?\n/.test(value);
+      const startsWithPunctuation = /^\p{P}/u.test(value);
+
+      if (hasTrailingSpace) {
+        if (!value || startsWithLineBreak || startsWithPunctuation) {
+          result = result.replace(/[ \t]+$/, "");
+        } else if (startsWithSpace) {
+          value = value.replace(/^[ \t]+/, "");
+        }
+      } else if (!result || /\r?\n$/.test(result)) {
+        value = value.replace(/^[ \t]+/, "");
+      }
+
+      if (/\r?\n$/.test(result) && /^\r?\n/.test(value)) {
+        value = value.replace(/^\r?\n/, "");
+      }
+      removedTag = false;
+    }
+
+    result += value;
+  }
+
+  return result.trim();
+}
+
 function validateInlineMemoTags(
   input: { content: string },
   context: z.RefinementCtx
@@ -127,6 +201,7 @@ export const memoCreateSchema = z
     tags: memoTagsSchema.default([]),
     imageIds: memoImageIdsSchema.default([]),
     videoUrls: memoVideoUrlsSchema.default([]),
+    location: memoLocationSchema.nullable().default(null),
     status: memoStatusSchema.default("published")
   })
   .superRefine((input, context) => {
@@ -142,6 +217,7 @@ export const memoInputSchema = z
     tags: memoTagsSchema,
     imageIds: memoImageIdsSchema,
     videoUrls: memoVideoUrlsSchema,
+    location: memoLocationSchema.nullable(),
     status: memoStatusSchema,
     isPinned: z.boolean(),
     version: z.number().int().nonnegative()
@@ -176,6 +252,7 @@ export interface Memo {
   tags: string[];
   images: MemoImage[];
   videos: MemoVideo[];
+  location: MemoLocation | null;
   status: MemoStatus;
   isPinned: boolean;
   publishedAt: string | null;

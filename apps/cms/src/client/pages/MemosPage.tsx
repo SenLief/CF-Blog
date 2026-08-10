@@ -1,5 +1,8 @@
 import type { Memo } from "@cf-blog/contracts";
-import { memoContentParts } from "@cf-blog/contracts";
+import {
+  memoTextWithoutTags,
+  openStreetMapLocationUrl
+} from "@cf-blog/contracts";
 import { useEffect, useState } from "react";
 import {
   MemoComposer,
@@ -26,6 +29,7 @@ export function MemosPage() {
   const [memos, setMemos] = useState<Memo[]>([]);
   const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
   const [editingMemo, setEditingMemo] = useState<Memo | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -38,7 +42,11 @@ export function MemosPage() {
     const timer = window.setTimeout(() => {
       setLoading(true);
       void api
-        .listMemos(status || undefined, query.trim() || undefined)
+        .listMemos({
+          status: status || undefined,
+          query: query.trim() || undefined,
+          tag: tagFilter || undefined
+        })
         .then((items) => {
           if (!active) return;
           setMemos(items);
@@ -57,7 +65,7 @@ export function MemosPage() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [query, refreshKey, status]);
+  }, [query, refreshKey, status, tagFilter]);
 
   const createMemo = async (value: MemoComposerValue) => {
     setError("");
@@ -80,7 +88,12 @@ export function MemosPage() {
     );
     setEditingMemo(null);
     setNotice("短文已更新");
-    if (status && updated.status !== status) {
+    if (
+      (status && updated.status !== status) ||
+      (tagFilter && !updated.tags.some(
+        (tag) => tag.toLocaleLowerCase() === tagFilter.toLocaleLowerCase()
+      ))
+    ) {
       setRefreshKey((current) => current + 1);
     }
   };
@@ -99,6 +112,7 @@ export function MemosPage() {
         tags: memo.tags,
         imageIds: memo.images.map((image) => image.id),
         videoUrls: memo.videos.map((video) => video.sourceUrl),
+        location: memo.location,
         status: changes.status ?? memo.status,
         isPinned: changes.isPinned ?? memo.isPinned,
         version: memo.version
@@ -119,6 +133,13 @@ export function MemosPage() {
 
   const startEditing = (memo: Memo) => {
     setEditingMemo(memo);
+    setError("");
+    setNotice("");
+  };
+
+  const filterByTag = (tag: string) => {
+    setQuery("");
+    setTagFilter(tag);
     setError("");
     setNotice("");
   };
@@ -184,6 +205,17 @@ export function MemosPage() {
           />
         </div>
 
+        {tagFilter && (
+          <div className="memo-active-tag-filter" role="status">
+            <span>正在筛选 <strong>#{tagFilter}</strong></span>
+            <button
+              aria-label={`清除标签 ${tagFilter} 筛选`}
+              onClick={() => setTagFilter("")}
+              type="button"
+            >查看全部</button>
+          </div>
+        )}
+
         {(error || notice) && (
           <div className={`memo-page-message ${error ? "error" : ""}`} role="status">
             {error || notice}
@@ -197,6 +229,7 @@ export function MemosPage() {
         >
           {memos.map((memo) => {
             const isPending = pendingId === memo.id;
+            const visibleContent = memoTextWithoutTags(memo.content);
             if (editingMemo?.id === memo.id) {
               return (
                 <MemoComposer
@@ -259,23 +292,42 @@ export function MemosPage() {
                   </details>
                 </header>
 
-                {memo.content && (
-                  <p className="memo-feed-content">
-                    {memoContentParts(memo.content).map((part, index) =>
-                      part.type === "tag" ? (
-                        <span className="memo-inline-tag" key={`${part.value}-${index}`}>
-                          {part.value}
-                        </span>
-                      ) : part.value
-                    )}
-                  </p>
-                )}
+                {visibleContent && <p className="memo-feed-content">{visibleContent}</p>}
                 <MemoAttachments memo={memo} />
+                {(memo.location || memo.tags.length > 0) && (
+                  <div className="memo-feed-taxonomy">
+                    {memo.location && (
+                      <a
+                        className="memo-feed-location"
+                        href={openStreetMapLocationUrl(memo.location)}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        <span aria-hidden="true">⌖</span>
+                        {memo.location.name}
+                      </a>
+                    )}
+                    {memo.tags.length > 0 && (
+                      <div aria-label="短文标签" className="memo-feed-tags">
+                        {memo.tags.map((tag) => (
+                          <button
+                            aria-pressed={tag.toLocaleLowerCase() === tagFilter.toLocaleLowerCase()}
+                            key={tag}
+                            onClick={() => filterByTag(tag)}
+                            type="button"
+                          >#{tag}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </article>
             );
           })}
           {!loading && memos.length === 0 && (
-            <div className="memo-feed-empty">还没有短文。</div>
+            <div className="memo-feed-empty">
+              {tagFilter ? `没有使用 #${tagFilter} 的短文。` : "还没有短文。"}
+            </div>
           )}
         </section>
       </div>

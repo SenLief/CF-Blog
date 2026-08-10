@@ -70,9 +70,11 @@ export class ContentService extends WorkerEntrypoint<Env> {
       }
       const limit = integerParam(url, "limit", 20, 1, 100);
       const offset = integerParam(url, "offset", 0, 0);
+      const tag = url.searchParams.get("tag")?.trim() || undefined;
       return json(
         await listMemos(this.env.DB, this.env.MEDIA_BASE_URL, {
           status: "published",
+          tag,
           limit,
           offset
         })
