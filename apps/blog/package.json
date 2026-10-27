@@ -11,10 +11,10 @@
     "types": "wrangler types ./worker-configuration.d.ts"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.3.0",
+    "@astrojs/cloudflare": "^14.4.2",
     "@cf-blog/contracts": "workspace:*",
-    "astro": "^7.3.1",
-    "zod": "^4.5.4"
+    "astro": "^7.4.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9"
