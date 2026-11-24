@@ -36,7 +36,7 @@ if (lightbox instanceof HTMLDialogElement) {
     const alt = thumbnail?.alt ?? "";
     lightboxImage.src = item.href;
     lightboxImage.alt = alt;
-    if (caption) caption.textContent = alt === "短文图片" ? "" : alt;
+    if (caption) caption.textContent = alt === "碎念图片" ? "" : alt;
     if (counter) counter.textContent = `${activeIndex + 1} / ${items.length}`;
     preloadAdjacentImages();
   };

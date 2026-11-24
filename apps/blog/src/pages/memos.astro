@@ -2,6 +2,7 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import { cms } from "@/lib/cms";
 import {
+  PUBLIC_MEMOS_PATH,
   memoTextWithoutTags,
   openStreetMapLocationUrl
 } from "@cf-blog/contracts";
@@ -19,7 +20,7 @@ function memoHref(targetPage = 1): string {
   if (tag) params.set("tag", tag);
   if (targetPage > 1) params.set("page", String(targetPage));
   const query = params.toString();
-  return query ? `/memo?${query}` : "/memo";
+  return query ? `${PUBLIC_MEMOS_PATH}?${query}` : PUBLIC_MEMOS_PATH;
 }
 
 if (
@@ -31,18 +32,16 @@ if (
   pageParam === "1"
 ) {
   return Astro.redirect(
-    tagParam !== null && MEMO_TAG_PATTERN.test(tagParam) ? memoHref() : "/memo",
+    tagParam !== null && MEMO_TAG_PATTERN.test(tagParam) ? memoHref() : PUBLIC_MEMOS_PATH,
     302
   );
 }
 
-const site = await cms.site();
-
-if (!site.enableMemos) {
+const memoPage = await cms.memoPage(PAGE_SIZE + 1, offset, tag || undefined);
+if (!memoPage) {
   return new Response("Not found", { status: 404 });
 }
-
-const pageMemos = await cms.memos(PAGE_SIZE + 1, offset, tag || undefined);
+const { site, memos: pageMemos } = memoPage;
 
 if (page > 1 && pageMemos.length === 0) {
   return Astro.redirect(memoHref(), 302);
@@ -87,25 +86,25 @@ function providerLabel(provider: string): string {
 
 <BaseLayout
   site={site}
-  title={`短文${tag ? ` · #${tag}` : ""}${page > 1 ? ` · 第 ${page} 页` : ""}`}
+  title={`碎念${tag ? ` · #${tag}` : ""}${page > 1 ? ` · 第 ${page} 页` : ""}`}
   description={tag
-    ? `${site.title} 中带有 #${tag} 标签的短文`
-    : site.memoDescription || `${site.title} 的短文与即时想法`}
+    ? `${site.title} 中带有 #${tag} 标签的碎念`
+    : site.memoDescription || `${site.title} 的碎念`}
 >
   <section class="memo-page">
     <header class="section-hero memo-hero">
-      <p class="kicker">Memos</p>
-      <h1>短文</h1>
+      <p class="kicker">MEMOS</p>
+      <h1>碎念</h1>
       {site.memoDescription && <p>{site.memoDescription}</p>}
       {tag && (
         <div class="memo-filter" aria-label={`当前按标签 ${tag} 筛选`}>
           <span>标签 <strong>#{tag}</strong></span>
-          <a href="/memo">查看全部短文</a>
+          <a href={PUBLIC_MEMOS_PATH}>查看全部碎念</a>
         </div>
       )}
     </header>
 
-    <div class="memo-timeline" aria-label="短文时间轴">
+    <div class="memo-timeline" aria-label="碎念时间轴">
       {memos.map((memo) => {
         const timestamp = memo.publishedAt ?? memo.createdAt;
         const visibleContent = memoTextWithoutTags(memo.content);
@@ -139,7 +138,7 @@ function providerLabel(provider: string): string {
                           rel="noreferrer"
                         >
                           <img
-                            alt={image.alt || "短文图片"}
+                            alt={image.alt || "碎念图片"}
                             height={image.height ?? undefined}
                             loading="lazy"
                             src={image.url}
@@ -189,13 +188,13 @@ function providerLabel(provider: string): string {
                     </a>
                   )}
                   {memo.tags.length > 0 && (
-                    <div class="memo-tags" aria-label="短文标签">
+                    <div class="memo-tags" aria-label="碎念标签">
                       {memo.tags.map((memoTag) => (
                         <a
                           aria-current={tag.toLocaleLowerCase() === memoTag.toLocaleLowerCase()
                             ? "page"
                             : undefined}
-                          href={`/memo?tag=${encodeURIComponent(memoTag)}`}
+                          href={`${PUBLIC_MEMOS_PATH}?tag=${encodeURIComponent(memoTag)}`}
                         >
                           #{memoTag}
                         </a>
@@ -210,13 +209,13 @@ function providerLabel(provider: string): string {
       })}
       {memos.length === 0 && (
         <p class="empty-state">
-          {tag ? <>还没有使用 <strong>#{tag}</strong> 的公开短文。</> : "还没有公开短文。"}
+          {tag ? <>还没有使用 <strong>#{tag}</strong> 的公开碎念。</> : "还没有公开碎念。"}
         </p>
       )}
     </div>
 
     {(hasPreviousPage || hasNextPage) && (
-      <nav class="pagination memo-pagination" aria-label="短文分页">
+      <nav class="pagination memo-pagination" aria-label="碎念分页">
         <div class="pagination-side">
           {hasPreviousPage && <a href={previousPageHref} rel="prev">← 上一页</a>}
         </div>

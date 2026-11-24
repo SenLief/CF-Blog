@@ -1,13 +1,14 @@
 ---
-import type { SiteSettings } from "@cf-blog/contracts";
+import { PUBLIC_MEMOS_PATH, type SiteSettings } from "@cf-blog/contracts";
 
 interface Props {
   site: SiteSettings;
 }
 
 const { site } = Astro.props;
+const memoNavItem = { label: "碎念", href: PUBLIC_MEMOS_PATH };
 const defaultNav = [
-  { label: "Memo", href: "/memo" },
+  memoNavItem,
   { label: "归档", href: "/archives" },
   { label: "标签", href: "/tags" },
   { label: "系列", href: "/series" },
@@ -17,14 +18,10 @@ const defaultNav = [
 const configuredNav = site.nav.length > 0 ? site.nav : defaultNav;
 const memoAwareNav = site.enableMemos
   ? configuredNav
-  : configuredNav.filter(
-      (item) => item.href.replace(/\/+$/, "") !== "/memo"
-    );
-const hasMemo = memoAwareNav.some(
-  (item) => item.href.replace(/\/+$/, "") === "/memo"
-);
+  : configuredNav.filter((item) => item.href.split(/[?#]/, 1)[0] !== PUBLIC_MEMOS_PATH);
+const hasMemo = memoAwareNav.some((item) => item.href === PUBLIC_MEMOS_PATH);
 const navWithMemo = site.enableMemos && !hasMemo
-  ? [{ label: "Memo", href: "/memo" }, ...memoAwareNav]
+  ? [memoNavItem, ...memoAwareNav]
   : memoAwareNav;
 const hasSeries = navWithMemo.some(
   (item) => item.href.replace(/\/+$/, "") === "/series"

@@ -3,6 +3,8 @@ import { z } from "zod";
 export const postStatusSchema = z.enum(["draft", "published", "archived"]);
 export type PostStatus = z.infer<typeof postStatusSchema>;
 
+export const PUBLIC_MEMOS_PATH = "/memos";
+
 export const memoStatusSchema = z.enum(["draft", "published"]);
 export type MemoStatus = z.infer<typeof memoStatusSchema>;
 
@@ -176,7 +178,7 @@ function validateInlineMemoTags(
   if (extractMemoTags(input.content).length > 8) {
     context.addIssue({
       code: "custom",
-      message: "每条短文最多使用 8 个标签",
+      message: "每条碎念最多使用 8 个标签",
       path: ["tags"]
     });
   }
@@ -363,6 +365,11 @@ export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;
 export interface SiteSettings extends SiteSettingsInput {
   faviconUrl: string;
   updatedAt: string;
+}
+
+export interface PublicMemoPage {
+  site: SiteSettings;
+  memos: Memo[];
 }
 
 export const postInputSchema = z.object({

@@ -1,8 +1,8 @@
 import type {
   GroupDetail,
   GroupSummary,
-  Memo,
   PostDetail,
+  PublicMemoPage,
   PublicPostDetail,
   PostSummary,
   SearchEntry,
@@ -18,23 +18,28 @@ async function call(path: string): Promise<Response> {
   );
 }
 
-async function json<T>(path: string): Promise<T> {
-  const response = await call(path);
+async function readJson<T>(response: Response, path: string): Promise<T> {
   if (!response.ok) {
     throw new Error(`CMS request failed: ${response.status} ${path}`);
   }
   return (await response.json()) as T;
 }
 
+async function json<T>(path: string): Promise<T> {
+  return readJson<T>(await call(path), path);
+}
+
 export const cms = {
   site: () => json<SiteSettings>("/site"),
-  memos: (limit = 20, offset = 0, tag?: string) => {
+  async memoPage(limit: number, offset: number, tag?: string): Promise<PublicMemoPage | null> {
     const params = new URLSearchParams({
       limit: String(limit),
       offset: String(offset)
     });
     if (tag) params.set("tag", tag);
-    return json<Memo[]>(`/memos?${params}`);
+    const path = `/memo-page?${params}`;
+    const response = await call(path);
+    return response.status === 404 ? null : readJson<PublicMemoPage>(response, path);
   },
   posts: (limit = 20, offset = 0) =>
     json<PostSummary[]>(`/posts?limit=${limit}&offset=${offset}`),
@@ -62,7 +67,8 @@ export const cms = {
       redirectTo: null
     };
   },
-  archive: () => json<PostSummary[]>("/archive"),
+  archive: (limit?: number) =>
+    json<PostSummary[]>(limit === undefined ? "/archive" : `/archive?limit=${limit}`),
   searchIndex: () => json<SearchEntry[]>("/search-index"),
   preview: (token: string) =>
     json<PostDetail>(`/preview/${encodeURIComponent(token)}`),

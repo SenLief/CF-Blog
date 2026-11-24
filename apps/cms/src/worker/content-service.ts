@@ -1,3 +1,4 @@
+import type { PublicMemoPage } from "@cf-blog/contracts";
 import { WorkerEntrypoint } from "cloudflare:workers";
 import {
   getGroupDetailBySlug,
@@ -47,9 +48,11 @@ export class ContentService extends WorkerEntrypoint<Env> {
       );
     }
 
-    if (url.pathname === "/posts") {
-      const limit = integerParam(url, "limit", 20, 1, 100);
-      const offset = integerParam(url, "offset", 0, 0);
+    if (url.pathname === "/posts" || url.pathname === "/archive") {
+      const archive = url.pathname === "/archive";
+      const maxLimit = archive ? 500 : 100;
+      const limit = integerParam(url, "limit", archive ? 500 : 20, 1, maxLimit);
+      const offset = archive ? 0 : integerParam(url, "offset", 0, 0);
       return json(
         await listPosts(this.env.DB, {
           status: "published",
@@ -60,36 +63,22 @@ export class ContentService extends WorkerEntrypoint<Env> {
       );
     }
 
-    if (url.pathname === "/memos") {
-      const settings = await getSiteSettings(
-        this.env.DB,
-        this.env.MEDIA_BASE_URL
-      );
-      if (!settings.enableMemos) {
+    if (url.pathname === "/memos" || url.pathname === "/memo-page") {
+      const includeSite = url.pathname === "/memo-page";
+      const site = await getSiteSettings(this.env.DB, this.env.MEDIA_BASE_URL);
+      if (!site.enableMemos) {
         return json({ error: "Not found" }, 404);
       }
       const limit = integerParam(url, "limit", 20, 1, 100);
       const offset = integerParam(url, "offset", 0, 0);
       const tag = url.searchParams.get("tag")?.trim() || undefined;
-      return json(
-        await listMemos(this.env.DB, this.env.MEDIA_BASE_URL, {
-          status: "published",
-          tag,
-          limit,
-          offset
-        })
-      );
-    }
-
-    if (url.pathname === "/archive") {
-      return json(
-        await listPosts(this.env.DB, {
-          status: "published",
-          excludeStandalonePages: true,
-          limit: 500,
-          offset: 0
-        })
-      );
+      const memos = await listMemos(this.env.DB, this.env.MEDIA_BASE_URL, {
+        status: "published",
+        tag,
+        limit,
+        offset
+      });
+      return json(includeSite ? ({ site, memos } satisfies PublicMemoPage) : memos);
     }
 
     if (url.pathname === "/groups") {

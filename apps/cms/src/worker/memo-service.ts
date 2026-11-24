@@ -267,7 +267,7 @@ async function requireMemo(
 ): Promise<Memo> {
   const memo = await getMemoById(db, id, mediaBaseUrl);
   if (!memo) {
-    throw new AppError(404, "MEMO_NOT_FOUND", "找不到这条短文");
+    throw new AppError(404, "MEMO_NOT_FOUND", "找不到这条碎念");
   }
   return memo;
 }
@@ -320,7 +320,7 @@ async function assertImagesExist(
     .bind(...imageIds)
     .all<{ id: string }>();
   if (new Set(result.results.map((item) => item.id)).size !== imageIds.length) {
-    throw new AppError(422, "MEMO_IMAGE_NOT_FOUND", "选择的短文图片不存在");
+    throw new AppError(422, "MEMO_IMAGE_NOT_FOUND", "选择的碎念图片不存在");
   }
 }
 
@@ -387,7 +387,7 @@ export async function updateMemo(
 ): Promise<Memo> {
   const existing = await requireMemo(db, id, mediaBaseUrl);
   if (existing.version !== input.version) {
-    throw new AppError(409, "VERSION_CONFLICT", "短文已在其他页面中更新", {
+    throw new AppError(409, "VERSION_CONFLICT", "碎念已在其他页面中更新", {
       serverVersion: existing.version
     });
   }
@@ -470,7 +470,7 @@ export async function updateMemo(
   ]);
   if ((result[0]?.meta.changes ?? 0) !== 1) {
     const latest = await getMemoById(db, id, mediaBaseUrl);
-    throw new AppError(409, "VERSION_CONFLICT", "短文已在其他页面中更新", {
+    throw new AppError(409, "VERSION_CONFLICT", "碎念已在其他页面中更新", {
       ...(latest ? { serverVersion: latest.version } : {})
     });
   }
@@ -486,6 +486,6 @@ export async function deleteMemo(
     .bind(id)
     .run();
   if ((result.meta.changes ?? 0) !== 1) {
-    throw new AppError(404, "MEMO_NOT_FOUND", "找不到这条短文");
+    throw new AppError(404, "MEMO_NOT_FOUND", "找不到这条碎念");
   }
 }

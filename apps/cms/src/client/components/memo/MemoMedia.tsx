@@ -48,7 +48,7 @@ export function MemoAttachments({ memo }: { memo: Memo }) {
           {memo.images.map((image) => (
             <a href={image.url} key={image.id} rel="noreferrer" target="_blank">
               <img
-                alt={image.alt || "短文图片"}
+                alt={image.alt || "碎念图片"}
                 height={image.height ?? undefined}
                 loading="lazy"
                 src={image.url}

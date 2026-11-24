@@ -5,11 +5,10 @@ import { escapeXml } from "@/lib/format";
 export const GET: APIRoute = async ({ request }) => {
   const [site, posts] = await Promise.all([
     cms.site(),
-    cms.archive()
+    cms.archive(50)
   ]);
   const origin = new URL(request.url).origin;
   const items = posts
-    .slice(0, 50)
     .map(
       (post) => `
       <item>

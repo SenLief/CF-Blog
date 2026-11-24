@@ -79,7 +79,7 @@ async function requireMemosEnabled(db: D1Database): Promise<void> {
     "SELECT enable_memos FROM site_settings WHERE id = 1"
   ).first<{ enable_memos: number }>();
   if (settings?.enable_memos !== 1) {
-    throw new AppError(404, "MEMOS_DISABLED", "短文功能未启用");
+    throw new AppError(404, "MEMOS_DISABLED", "碎念功能未启用");
   }
 }
 
@@ -291,7 +291,7 @@ app.get("/api/memos", async (c) => {
     ? memoStatusSchema.safeParse(statusValue)
     : null;
   if (statusValue && !statusResult?.success) {
-    throw new AppError(422, "INVALID_MEMO_STATUS", "短文状态无效");
+    throw new AppError(422, "INVALID_MEMO_STATUS", "碎念状态无效");
   }
   return c.json(
     await listMemos(c.env.DB, c.env.MEDIA_BASE_URL, {
@@ -683,7 +683,7 @@ app.delete("/api/media/:id", async (c) => {
     .bind(mediaId)
     .first<{ memo_id: string }>();
   if (memoReference) {
-    throw new AppError(409, "MEDIA_IN_USE", "该图片仍被短文引用");
+    throw new AppError(409, "MEDIA_IN_USE", "该图片仍被碎念引用");
   }
   await c.env.DB.prepare("DELETE FROM media WHERE id = ?").bind(mediaId).run();
   await c.env.MEDIA.delete(item.object_key);

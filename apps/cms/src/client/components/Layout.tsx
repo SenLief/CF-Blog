@@ -7,7 +7,7 @@ import { SITE_SETTINGS_UPDATED_EVENT } from "../siteSettingsEvents";
 const navItems = [
   { href: "/", label: "概览", icon: "⌂" },
   { href: "/posts", label: "文章", icon: "¶" },
-  { href: "/memos", label: "短文", icon: "·" },
+  { href: "/memos", label: "碎念", icon: "·" },
   { href: "/groups", label: "分组", icon: "≡" },
   { href: "/media", label: "媒体", icon: "◫" },
   { href: "/settings", label: "设置", icon: "⚙" }

@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { ABOUT_PAGE_SLUG } from "@cf-blog/contracts";
+import { ABOUT_PAGE_SLUG, PUBLIC_MEMOS_PATH } from "@cf-blog/contracts";
 import { cms } from "@/lib/cms";
 import { escapeXml } from "@/lib/format";
 
@@ -13,7 +13,7 @@ export const GET: APIRoute = async ({ request }) => {
   const origin = new URL(request.url).origin;
   const paths = [
     "/",
-    ...(site.enableMemos ? ["/memo"] : []),
+    ...(site.enableMemos ? [PUBLIC_MEMOS_PATH] : []),
     "/archives",
     "/tags",
     "/series",

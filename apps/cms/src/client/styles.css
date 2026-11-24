@@ -103,8 +103,9 @@ button { cursor: pointer; }
 .memo-admin-page { padding-top: 42px; }
 .memo-admin-column { width: min(100%, 680px); margin-inline: auto; }
 .memo-page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 18px; }
+.memo-page-header .eyebrow { margin: 0 0 3px; }
 .memo-page-header h1 { margin: 0; font-size: 27px; letter-spacing: -.035em; }
-.memo-page-header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.memo-page-header h1 + p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .memo-editor-shell { position: relative; display: flex; flex-direction: column; gap: 8px; width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px 8px; background: var(--paper); transition: border-color 150ms ease, box-shadow 150ms ease; }
 .memo-editor-shell:focus-within { border-color: #c6c2b8; box-shadow: 0 0 0 3px rgb(44 80 150 / 5%); }
 .memo-editor-mode { display: flex; align-items: center; justify-content: space-between; margin: -2px 0 0; color: var(--muted); font-size: 11px; }

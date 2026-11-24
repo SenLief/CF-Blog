@@ -115,7 +115,7 @@ function cachedDraft(): DraftState {
               filename:
                 "filename" in image && typeof image.filename === "string"
                   ? image.filename
-                  : alt || "短文图片",
+                  : alt || "碎念图片",
               mimeType:
                 "mimeType" in image && typeof image.mimeType === "string"
                   ? image.mimeType
@@ -327,7 +327,7 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
       return;
     }
     if (draft.videoUrls.length >= 4) {
-      setError("每条短文最多添加 4 个视频");
+      setError("每条碎念最多添加 4 个视频");
       return;
     }
     patchDraft({ videoUrls: [...draft.videoUrls, video.sourceUrl] });
@@ -453,7 +453,7 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
     setInsertMenuOpen(false);
     if (files.length === 0) return;
     if (draft.images.length + files.length > 9) {
-      setError("每条短文最多添加 9 张图片");
+      setError("每条碎念最多添加 9 张图片");
       return;
     }
     setUploading(true);
@@ -461,7 +461,7 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
     const uploaded: MemoImage[] = [];
     try {
       for (const file of files) {
-        const alt = file.name.replace(/\.[^.]+$/, "") || "短文图片";
+        const alt = file.name.replace(/\.[^.]+$/, "") || "碎念图片";
         uploaded.push(toMemoImage(await api.uploadMedia(file, alt)));
       }
       patchDraft({ images: [...draft.images, ...uploaded] });
@@ -513,7 +513,7 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
         setDraft(blankDraft());
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "短文保存失败");
+      setError(reason instanceof Error ? reason.message : "碎念保存失败");
     } finally {
       setSaving(false);
     }
@@ -527,16 +527,16 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
   };
 
   return (
-    <section className="memo-editor-shell" aria-label={memo ? "编辑短文" : "新建短文"}>
+    <section className="memo-editor-shell" aria-label={memo ? "编辑碎念" : "新建碎念"}>
       {memo && (
         <div className="memo-editor-mode">
-          <span>编辑短文</span>
+          <span>编辑碎念</span>
           <button onClick={onCancel} type="button">取消</button>
         </div>
       )}
 
       <textarea
-        aria-label="短文内容"
+        aria-label="碎念内容"
         maxLength={20_000}
         onChange={(event) => patchDraft({ content: event.target.value })}
         onKeyDown={handleKeyDown}
@@ -886,7 +886,7 @@ export function MemoComposer({ memo, onCancel, onSubmit }: MemoComposerProps) {
           <label className="memo-status-select">
             <span className={`memo-status-dot ${draft.status}`} />
             <select
-              aria-label="短文状态"
+              aria-label="碎念状态"
               onChange={(event) =>
                 patchDraft({ status: event.target.value as MemoStatus })
               }

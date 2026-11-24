@@ -1,3 +1,4 @@
+import { PUBLIC_MEMOS_PATH } from "@cf-blog/contracts";
 import type {
   ImageMediaItem,
   SiteSettings,
@@ -124,11 +125,11 @@ export function SettingsPage() {
           : saved
       );
       notifySiteSettingsUpdated(saved);
-      setMessage(enableMemos ? "短文功能已开启。" : "短文功能已关闭。");
+      setMessage(enableMemos ? "碎念功能已开启。" : "碎念功能已关闭。");
     } catch (reason) {
       setSettings(previous);
       notifySiteSettingsUpdated(previous);
-      setMessage(reason instanceof Error ? reason.message : "短文功能设置失败");
+      setMessage(reason instanceof Error ? reason.message : "碎念功能设置失败");
     } finally {
       setSavingMemos(false);
     }
@@ -228,11 +229,11 @@ export function SettingsPage() {
             <h2>功能</h2>
             <label className="feature-toggle">
               <span>
-                <strong>短文功能</strong>
-                <small>启用后台短文管理、公开 Memo 页面和相关导航。</small>
+                <strong>碎念功能</strong>
+                <small>启用后台碎念管理、公开碎念页面和相关导航。</small>
               </span>
               <input
-                aria-label="启用短文功能"
+                aria-label="启用碎念功能"
                 checked={settings.enableMemos}
                 disabled={saving || savingMemos}
                 onChange={(event) => void setMemosEnabled(event.target.checked)}
@@ -242,13 +243,13 @@ export function SettingsPage() {
             </label>
             <p className="feature-toggle-help">
               {savingMemos
-                ? "正在保存短文功能设置…"
-                : "开关会立即生效；关闭后已有短文仍会保留。"}
+                ? "正在保存碎念功能设置…"
+                : "开关会立即生效；关闭后已有碎念仍会保留。"}
             </p>
             {settings.enableMemos && (
               <div className="memo-feature-settings">
                 <label>
-                  短文介绍
+                  碎念介绍
                   <textarea
                     maxLength={320}
                     onChange={(event) =>
@@ -271,7 +272,7 @@ export function SettingsPage() {
           <section className="settings-section">
             <h2>导航</h2>
             <p className="field-help">每行使用“名称|地址”，相对地址可指向博客内部。</p>
-            <textarea rows={7} value={navLines} onChange={(e) => setNavLines(e.target.value)} placeholder={"Memo|/memo\n归档|/archives\n关于|/about"} />
+            <textarea rows={7} value={navLines} onChange={(e) => setNavLines(e.target.value)} placeholder={`碎念|${PUBLIC_MEMOS_PATH}\n归档|/archives\n关于|/about`} />
           </section>
 
           <section className="settings-section">

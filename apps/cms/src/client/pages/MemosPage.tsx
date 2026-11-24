@@ -54,7 +54,7 @@ export function MemosPage() {
         })
         .catch((reason: unknown) => {
           if (active) {
-            setError(reason instanceof Error ? reason.message : "短文加载失败");
+            setError(reason instanceof Error ? reason.message : "碎念加载失败");
           }
         })
         .finally(() => {
@@ -71,7 +71,7 @@ export function MemosPage() {
     setError("");
     setNotice("");
     await api.createMemo(value);
-    setNotice(value.status === "published" ? "短文已发布" : "草稿已保存");
+    setNotice(value.status === "published" ? "碎念已发布" : "草稿已保存");
     setRefreshKey((current) => current + 1);
   };
 
@@ -87,7 +87,7 @@ export function MemosPage() {
       items.map((item) => (item.id === updated.id ? updated : item))
     );
     setEditingMemo(null);
-    setNotice("短文已更新");
+    setNotice("碎念已更新");
     if (
       (status && updated.status !== status) ||
       (tagFilter && !updated.tags.some(
@@ -120,12 +120,12 @@ export function MemosPage() {
       setMemos((items) =>
         items.map((item) => (item.id === updated.id ? updated : item))
       );
-      setNotice("短文已更新");
+      setNotice("碎念已更新");
       if ((status && updated.status !== status) || changes.isPinned !== undefined) {
         setRefreshKey((current) => current + 1);
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "短文更新失败");
+      setError(reason instanceof Error ? reason.message : "碎念更新失败");
     } finally {
       setPendingId(null);
     }
@@ -145,7 +145,7 @@ export function MemosPage() {
   };
 
   const remove = async (memo: Memo) => {
-    if (pendingId || !window.confirm("永久删除这条短文？删除后无法恢复。")) return;
+    if (pendingId || !window.confirm("永久删除这条碎念？删除后无法恢复。")) return;
     const previousMemos = memos;
     setPendingId(memo.id);
     setError("");
@@ -154,10 +154,10 @@ export function MemosPage() {
     if (editingMemo?.id === memo.id) setEditingMemo(null);
     try {
       await api.deleteMemo(memo.id);
-      setNotice("短文已删除，图片仍保留在媒体库中");
+      setNotice("碎念已删除，图片仍保留在媒体库中");
     } catch (reason) {
       setMemos(previousMemos);
-      setError(reason instanceof Error ? reason.message : "短文删除失败");
+      setError(reason instanceof Error ? reason.message : "碎念删除失败");
     } finally {
       setPendingId(null);
     }
@@ -168,7 +168,8 @@ export function MemosPage() {
       <div className="memo-admin-column">
         <header className="memo-page-header">
           <div>
-            <h1>短文</h1>
+            <p className="eyebrow">MEMOS</p>
+            <h1>碎念</h1>
             <p>快速记录，稍后再整理。</p>
           </div>
         </header>
@@ -180,7 +181,7 @@ export function MemosPage() {
         />
 
         <div className="memo-list-toolbar">
-          <div className="segmented" role="group" aria-label="筛选短文状态">
+          <div className="segmented" role="group" aria-label="筛选碎念状态">
             {([
               ["", "全部"],
               ["published", "公开"],
@@ -197,7 +198,7 @@ export function MemosPage() {
             ))}
           </div>
           <input
-            aria-label="搜索短文"
+            aria-label="搜索碎念"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="搜索"
             type="search"
@@ -224,7 +225,7 @@ export function MemosPage() {
 
         <section
           aria-busy={loading}
-          aria-label="短文列表"
+          aria-label="碎念列表"
           className={`memo-feed ${loading ? "loading" : ""}`}
         >
           {memos.map((memo) => {
@@ -251,7 +252,7 @@ export function MemosPage() {
                     {memo.status === "draft" && <span>草稿</span>}
                   </div>
                   <details className="memo-action-menu">
-                    <summary aria-label="短文操作">•••</summary>
+                    <summary aria-label="碎念操作">•••</summary>
                     <div>
                       <button
                         disabled={isPending}
@@ -308,7 +309,7 @@ export function MemosPage() {
                       </a>
                     )}
                     {memo.tags.length > 0 && (
-                      <div aria-label="短文标签" className="memo-feed-tags">
+                      <div aria-label="碎念标签" className="memo-feed-tags">
                         {memo.tags.map((tag) => (
                           <button
                             aria-pressed={tag.toLocaleLowerCase() === tagFilter.toLocaleLowerCase()}
@@ -326,7 +327,7 @@ export function MemosPage() {
           })}
           {!loading && memos.length === 0 && (
             <div className="memo-feed-empty">
-              {tagFilter ? `没有使用 #${tagFilter} 的短文。` : "还没有短文。"}
+              {tagFilter ? `没有使用 #${tagFilter} 的碎念。` : "还没有碎念。"}
             </div>
           )}
         </section>

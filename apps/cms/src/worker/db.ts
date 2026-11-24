@@ -17,6 +17,7 @@ import type {
 } from "@cf-blog/contracts";
 import {
   ABOUT_PAGE_SLUG,
+  PUBLIC_MEMOS_PATH,
   isStandalonePageSlug,
   normalizeVideoSource,
   slugify
@@ -45,13 +46,11 @@ interface SiteRow {
   updated_at: string;
 }
 
-interface PostRow {
+interface PostSummaryRow {
   id: string;
   slug: string;
   title: string;
   excerpt: string;
-  content_markdown: string;
-  content_html: string;
   cover_url: string;
   status: PostStatus;
   reading_minutes: number;
@@ -64,6 +63,11 @@ interface PostRow {
   group_position: number | null;
   group_name: string | null;
   group_slug: string | null;
+}
+
+interface PostRow extends PostSummaryRow {
+  content_markdown: string;
+  content_html: string;
 }
 
 interface GroupRow {
@@ -121,16 +125,25 @@ interface ExternalVideoRow {
   created_at: string;
 }
 
-const POST_SELECT = `
-  SELECT
-    p.*,
-    COALESCE(group_concat(t.name, char(31)), '') AS tags,
-    g.name AS group_name,
-    g.slug AS group_slug
-  FROM posts p
+const POST_SUMMARY_COLUMNS = `
+  p.id, p.slug, p.title, p.excerpt, p.cover_url, p.status,
+  p.reading_minutes, p.version, p.published_at, p.created_at, p.updated_at,
+  p.group_id, p.group_position
+`;
+const POST_METADATA_COLUMNS = `
+  COALESCE(group_concat(t.name, char(31)), '') AS tags,
+  g.name AS group_name,
+  g.slug AS group_slug
+`;
+const POST_METADATA_JOINS = `
   LEFT JOIN post_tags pt ON pt.post_id = p.id
   LEFT JOIN tags t ON t.id = pt.tag_id
   LEFT JOIN "groups" g ON g.id = p.group_id
+`;
+const POST_SELECT = `
+  SELECT p.*, ${POST_METADATA_COLUMNS}
+  FROM posts p
+  ${POST_METADATA_JOINS}
 `;
 
 const GROUP_SELECT = `
@@ -173,14 +186,21 @@ function mapSite(row: SiteRow, mediaBaseUrl: string): SiteSettings {
       hasFavicon && row.favicon_object_key
         ? mediaUrl(mediaBaseUrl, row.favicon_object_key)
         : "",
-    nav: parseJsonArray(row.nav_json),
+    nav: parseJsonArray<SiteSettings["nav"][number]>(row.nav_json).map((item) => {
+      const memoHref = typeof item?.href === "string" && item.href.match(/^\/memos?\/*([?#].*)?$/);
+      if (!memoHref) return item;
+      const label = typeof item.label === "string" && /^(?:短文|memos?)$/i.test(item.label.trim())
+        ? "碎念"
+        : item.label;
+      return { ...item, href: `${PUBLIC_MEMOS_PATH}${memoHref[1] ?? ""}`, label };
+    }),
     social: parseJsonArray(row.social_json),
     seoImageUrl: row.seo_image_url,
     updatedAt: row.updated_at
   };
 }
 
-function mapPost(row: PostRow): PostDetail {
+function mapSummary(row: PostSummaryRow): PostSummary {
   const group: GroupReference | null =
     row.group_id && row.group_name && row.group_slug
       ? {
@@ -194,8 +214,6 @@ function mapPost(row: PostRow): PostDetail {
     slug: row.slug,
     title: row.title,
     excerpt: row.excerpt,
-    contentMarkdown: row.content_markdown,
-    contentHtml: row.content_html,
     coverUrl: row.cover_url,
     status: row.status,
     tags: row.tags ? row.tags.split("\u001f").filter(Boolean) : [],
@@ -222,9 +240,12 @@ function mapGroup(row: GroupRow): GroupSummary {
   };
 }
 
-function mapSummary(post: PostDetail): PostSummary {
-  const { contentMarkdown: _markdown, contentHtml: _html, ...summary } = post;
-  return summary;
+function mapPost(row: PostRow): PostDetail {
+  return {
+    ...mapSummary(row),
+    contentMarkdown: row.content_markdown,
+    contentHtml: row.content_html
+  };
 }
 
 function mapRevision(row: RevisionRow): PostRevision {
@@ -297,19 +318,26 @@ export async function listPosts(
   const where = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
   const order = options.groupId
     ? "p.group_position ASC, p.published_at ASC, p.id ASC"
-    : "COALESCE(p.published_at, p.updated_at) DESC";
+    : "COALESCE(p.published_at, p.updated_at) DESC, p.id DESC";
   values.push(Math.min(options.limit ?? 200, 500), options.offset ?? 0);
   const result = await db
     .prepare(
-      `${POST_SELECT}
-       ${where}
+      `WITH post_page AS (
+         SELECT ${POST_SUMMARY_COLUMNS}
+         FROM posts p
+         ${where}
+         ORDER BY ${order}
+         LIMIT ? OFFSET ?
+       )
+       SELECT p.*, ${POST_METADATA_COLUMNS}
+       FROM post_page p
+       ${POST_METADATA_JOINS}
        GROUP BY p.id
-       ORDER BY ${order}
-       LIMIT ? OFFSET ?`
+       ORDER BY ${order}`
     )
     .bind(...values)
-    .all<PostRow>();
-  return result.results.map((row) => mapSummary(mapPost(row)));
+    .all<PostSummaryRow>();
+  return result.results.map(mapSummary);
 }
 
 export async function listGroups(
