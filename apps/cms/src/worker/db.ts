@@ -93,14 +93,13 @@ interface RevisionRow {
   created_at: string;
 }
 
-interface BulkPostRow {
-  id: string;
-  slug: string;
-  title: string;
-  excerpt: string;
-  content_markdown: string;
+type RevisionSource = Pick<
+  PostDetail,
+  "id" | "slug" | "title" | "excerpt" | "contentMarkdown" | "version"
+>;
+
+interface BulkPostRow extends RevisionSource {
   status: PostStatus;
-  version: number;
   group_id: string | null;
 }
 
@@ -758,39 +757,26 @@ async function getPostNavigation(
   post: PostDetail
 ): Promise<PostNavigation> {
   const publishedOrderAt = post.publishedAt ?? post.updatedAt;
-  const [previous, next] = await Promise.all([
-    db
+  const adjacentPost = (comparison: "<" | ">") => {
+    const order = comparison === "<" ? "DESC" : "ASC";
+    return db
       .prepare(
         `SELECT slug, title FROM posts
          WHERE status = 'published'
            AND slug != ? COLLATE NOCASE
-           AND (
-             COALESCE(published_at, updated_at) < ?
-             OR (COALESCE(published_at, updated_at) = ? AND id < ?)
-           )
-         ORDER BY COALESCE(published_at, updated_at) DESC, id DESC
+           AND (COALESCE(published_at, updated_at), id) ${comparison} (?, ?)
+         ORDER BY COALESCE(published_at, updated_at) ${order}, id ${order}
          LIMIT 1`
       )
-      .bind(ABOUT_PAGE_SLUG, publishedOrderAt, publishedOrderAt, post.id)
-      .first<{ slug: string; title: string }>(),
-    db
-      .prepare(
-        `SELECT slug, title FROM posts
-         WHERE status = 'published'
-           AND slug != ? COLLATE NOCASE
-           AND (
-             COALESCE(published_at, updated_at) > ?
-             OR (COALESCE(published_at, updated_at) = ? AND id > ?)
-           )
-         ORDER BY COALESCE(published_at, updated_at) ASC, id ASC
-         LIMIT 1`
-      )
-      .bind(ABOUT_PAGE_SLUG, publishedOrderAt, publishedOrderAt, post.id)
-      .first<{ slug: string; title: string }>()
+      .bind(ABOUT_PAGE_SLUG, publishedOrderAt, post.id);
+  };
+  const [previous, next] = await db.batch<{ slug: string; title: string }>([
+    adjacentPost("<"),
+    adjacentPost(">")
   ]);
   return {
-    previous: previous ?? null,
-    next: next ?? null
+    previous: previous?.results[0] ?? null,
+    next: next?.results[0] ?? null
   };
 }
 
@@ -917,43 +903,13 @@ export async function createRevision(
   post: PostDetail,
   reason: PostRevision["reason"]
 ): Promise<void> {
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO post_revisions (
-          id, post_id, version, title, slug, excerpt, content_markdown, reason, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        crypto.randomUUID(),
-        post.id,
-        post.version,
-        post.title,
-        post.slug,
-        post.excerpt,
-        post.contentMarkdown,
-        reason,
-        nowIso()
-      ),
-    db
-      .prepare(
-        `DELETE FROM post_revisions
-         WHERE post_id = ?
-           AND id NOT IN (
-             SELECT id FROM post_revisions
-             WHERE post_id = ?
-             ORDER BY created_at DESC
-             LIMIT 30
-           )`
-      )
-      .bind(post.id, post.id)
-  ]);
+  await db.batch(prepareRevisionStatements(db, post, reason, nowIso()));
 }
 
 function prepareRevisionStatements(
   db: D1Database,
-  post: BulkPostRow,
-  reason: "publish" | "unpublish",
+  post: RevisionSource,
+  reason: PostRevision["reason"],
   createdAt: string
 ): D1PreparedStatement[] {
   return [
@@ -970,7 +926,7 @@ function prepareRevisionStatements(
         post.title,
         post.slug,
         post.excerpt,
-        post.content_markdown,
+        post.contentMarkdown,
         reason,
         createdAt
       ),
@@ -997,7 +953,8 @@ export async function applyPostBulkAction(
   const result = await db
     .prepare(
       `SELECT
-        id, slug, title, excerpt, content_markdown, status, version, group_id
+        id, slug, title, excerpt, content_markdown AS contentMarkdown,
+        status, version, group_id
        FROM posts
        WHERE id IN (${placeholders})`
     )
@@ -1019,7 +976,7 @@ export async function applyPostBulkAction(
 
   if (input.action === "publish") {
     for (const post of affectedPosts) {
-      if (!post.title.trim() || !post.content_markdown.trim()) {
+      if (!post.title.trim() || !post.contentMarkdown.trim()) {
         throw new AppError(
           422,
           "POST_INCOMPLETE",
@@ -1027,7 +984,7 @@ export async function applyPostBulkAction(
           { postId: post.id }
         );
       }
-      if (/!\[\s*\]\([^)]+\)/.test(post.content_markdown)) {
+      if (/!\[\s*\]\([^)]+\)/.test(post.contentMarkdown)) {
         throw new AppError(
           422,
           "IMAGE_ALT_REQUIRED",

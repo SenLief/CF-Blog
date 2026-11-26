@@ -436,11 +436,11 @@ app.post(
   async (c) => {
     const { action, expectedVersion } = c.req.valid("json");
     const id = c.req.param("id");
-    const post = await getPostById(c.env.DB, id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "找不到文章");
-    }
     if (action === "save-version") {
+      const post = await getPostById(c.env.DB, id);
+      if (!post) {
+        throw new AppError(404, "POST_NOT_FOUND", "找不到文章");
+      }
       if (post.version !== expectedVersion) {
         throw new AppError(409, "VERSION_CONFLICT", "文章已在其他页面中更新", {
           serverVersion: post.version

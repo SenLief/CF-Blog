@@ -55,6 +55,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+let pendingSettings: Promise<SiteSettings> | undefined;
+
 export const api = {
   overview: () =>
     request<{
@@ -63,7 +65,10 @@ export const api = {
     }>("/api/overview"),
 
   getSettings: () =>
-    request<SiteSettings>("/api/settings", { cache: "no-store" }),
+    (pendingSettings ??= request<SiteSettings>("/api/settings", { cache: "no-store" })
+      .finally(() => {
+        pendingSettings = undefined;
+      })),
   saveSettings: (input: SiteSettingsInput) =>
     request<SiteSettings>("/api/settings", {
       method: "PUT",
